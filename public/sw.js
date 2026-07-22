@@ -1,7 +1,7 @@
 // Simple service worker for PWA installability
 // Uses network-first strategy — always tries the network, falls back to cache
 
-const CACHE_NAME = 'nkhbat-v1'
+const CACHE_NAME = 'goalchok-v1'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()

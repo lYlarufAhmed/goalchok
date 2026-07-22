@@ -18,8 +18,11 @@ export const en = {
     arGroups: { A: 'A', B: 'B', C: 'C' }
   },
   home: {
-    title: 'GoalChok-গোলছক',
+    title: 'GoalChok-গোলছک',
     subtitle: 'Championship',
+    description: 'The ultimate tournament platform. Track live scores, match schedules, standings, and top scorers in real-time.',
+    welcomeTitle: 'Welcome to GoalChok (গোলছক)',
+    welcomeDesc: 'GoalChok is a modern, real-time tournament tracking platform. Follow exciting live matches, track instant team standings, and stay up-to-date with player profiles and top scorers throughout the league.',
     groupsTable: 'Group Standings',
     matchesSchedule: 'Match Schedule',
     upcomingMatches: 'Upcoming Matches',

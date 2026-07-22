@@ -5,7 +5,7 @@ import {
 import { describe, it, beforeAll, afterAll, beforeEach } from 'vitest'
 import { readFileSync } from 'fs'
 
-const PROJECT_ID = 'nkhbat-alnujoom'
+const PROJECT_ID = 'goalchok-7391'
 
 describe('Firestore Security Rules', () => {
   let testEnv

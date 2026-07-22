@@ -155,6 +155,11 @@ export default function HomePage() {
               <span>★</span>
               <span>★</span>
             </div>
+
+            {/* Rebranding Intro Description */}
+            <p className="hero-content text-text-secondary dark:text-zinc-400 text-xs sm:text-sm md:text-base max-w-sm sm:max-w-md md:max-w-lg leading-relaxed font-medium mt-1">
+              {t.home.description}
+            </p>
           </div>
         </div>
       </div>
@@ -195,6 +200,16 @@ export default function HomePage() {
 
       {/* Main Content - Centered with max width */}
       <div className="px-4 sm:px-6 lg:px-8 xl:px-12 max-w-2xl lg:max-w-5xl xl:max-w-6xl mx-auto space-y-6 lg:space-y-8 xl:space-y-10">
+        {/* Welcome Intro Section */}
+        <div className="glass-card p-5 border border-border/30 rounded-2xl relative overflow-hidden bg-bg-surface/20 backdrop-blur-sm shadow-sm">
+          <div className="relative z-10 space-y-2">
+            <h3 className="text-base sm:text-lg font-bold text-accent">{t.home.welcomeTitle}</h3>
+            <p className="text-text-secondary dark:text-zinc-400 text-xs sm:text-sm leading-relaxed max-w-3xl font-medium">
+              {t.home.welcomeDesc}
+            </p>
+          </div>
+        </div>
+
         {/* Main Actions */}
         <div className="flex gap-3 pt-2 sm:pt-4">
           <Link to="/standings" className="flex-1">

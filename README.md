@@ -121,7 +121,7 @@ VITE_FIREBASE_PROJECT_ID=...
 
 The app is deployed via Firebase Hosting at:
 
-**https://nkhbat-alnujoom.web.app**
+**https://goalchok-7391.web.app**
 
 ```bash
 firebase deploy --only hosting

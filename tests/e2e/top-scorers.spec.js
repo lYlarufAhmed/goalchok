@@ -5,7 +5,7 @@ test.describe('Top Scorers Team Name E2E Test', () => {
     // Navigate to home and configure local storage for English
     await page.goto('/')
     await page.evaluate(() => {
-      localStorage.setItem('nkhbat-app-settings', JSON.stringify({
+      localStorage.setItem('goalchok-app-settings', JSON.stringify({
         state: { theme: 'dark', language: 'en' },
         version: 0
       }))

@@ -6,7 +6,7 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "site": "nkhbat-alnujoom",
+    "site": "goalchok-7391",
     "public": "dist",
     "ignore": [
       "firebase.json",
