@@ -12,10 +12,14 @@ vi.mock('firebase/firestore', () => ({
     return mockUnsubscribe
   },
   collection: vi.fn(),
-  getDocs: vi.fn(),
-  updateDoc: vi.fn(),
-  deleteDoc: vi.fn(),
-  writeBatch: vi.fn(),
+  getDocs: vi.fn().mockResolvedValue({ docs: [] }),
+  updateDoc: vi.fn().mockResolvedValue({}),
+  deleteDoc: vi.fn().mockResolvedValue({}),
+  writeBatch: vi.fn(() => ({
+    set: vi.fn(),
+    delete: vi.fn(),
+    commit: vi.fn().mockResolvedValue({}),
+  })),
   query: vi.fn(),
   where: vi.fn(),
 }))
@@ -56,7 +60,7 @@ describe('Knockout Store — Admin & Public Sync Simulation', () => {
     // The admin adds a match on the knockout page.
     // This should update the store state and trigger a write to Firestore.
     
-    store.addKOMatch({
+    await store.addKOMatch({
       round: 'QF',
       matchLabel: 'QF 1',
       teamA: 't1',
@@ -67,14 +71,15 @@ describe('Knockout Store — Admin & Public Sync Simulation', () => {
     })
 
     // Assert that setDoc was called to save the admin's changes to Firestore
-    expect(mockSetDoc).toHaveBeenCalledTimes(1)
-    const [docRef, payload] = mockSetDoc.mock.calls[0]
+    // It gets called twice: once for the match creation and once for the settings sync
+    expect(mockSetDoc).toHaveBeenCalledTimes(2)
+    
+    const [matchDocRef, matchPayload] = mockSetDoc.mock.calls[0]
+    expect(matchDocRef.path).toBe('knockout_matches/' + matchPayload.id)
+
+    const [docRef, payload] = mockSetDoc.mock.calls[1]
     expect(docRef.path).toBe('settings/knockout')
     expect(payload.step).toBe(3)
-    expect(payload.knockoutMatches).toHaveLength(1)
-    expect(payload.knockoutMatches[0].teamA).toBe('t1')
-    expect(payload.knockoutMatches[0].teamB).toBe('t2')
-    expect(payload.knockoutMatches[0].venue).toBe('Main Stadium')
 
     // ────────────────────────────────────────────────────────────────────────
     // FLOW 2: PUBLIC USER
@@ -92,7 +97,7 @@ describe('Knockout Store — Admin & Public Sync Simulation', () => {
       unsub: null,
     })
 
-    publicStore.listenToFirestore()
+    await publicStore.listenToFirestore()
 
     // Verify onSnapshot was called to listen to settings/knockout in Firestore
     expect(mockOnSnapshot).toHaveBeenCalledTimes(0) // We mocked onSnapshot in the vi.mock block

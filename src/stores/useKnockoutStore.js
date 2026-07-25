@@ -67,11 +67,15 @@ export const useKnockoutStore = create((set, get) => {
         (snapshot) => {
           if (snapshot.exists()) {
             const data = snapshot.data()
-            set({
+            const updates = {
               step: data.step ?? 3,
               qualifiedTeams: data.qualifiedTeams || [],
               champion: data.champion || null,
-            })
+            }
+            if (data.knockoutMatches) {
+              updates.knockoutMatches = data.knockoutMatches
+            }
+            set(updates)
           }
         },
         (err) => {
