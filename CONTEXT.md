@@ -27,3 +27,7 @@ _Avoid_: TieResolution, RankOverride
 **MatchLifecycleService**:
 The domain service governing match status transitions (scheduled -> live -> completed / postponed / scheduled) and enforcing result validation rules (score validation, knockout tie-breakers, scorer sanitization).
 _Avoid_: MatchManager, StatusUpdater, ScoreHandler
+
+**TournamentRepository**:
+The unified data access repository providing an abstraction layer over tournament persistence (teams, group matches, knockout matches, groups, settings, live scores), decoupling domain operations from Firebase Firestore and RTDB.
+_Avoid_: DataStore, DBWrapper, ServiceHub
