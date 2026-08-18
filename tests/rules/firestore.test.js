@@ -16,7 +16,7 @@ describe('Firestore Security Rules', () => {
       firestore: {
         rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8'),
         host: '127.0.0.1',
-        port: 8080,
+        port: 8085,
       },
     })
   })
@@ -30,7 +30,7 @@ describe('Firestore Security Rules', () => {
   })
 
   it('allows anyone to read matches documents', async () => {
-    const context = testEnv.anonymousRulesContext()
+    const context = testEnv.unauthenticatedContext()
     const db = context.firestore()
     const matchDoc = db.collection('matches').doc('test-match')
     await assertSucceeds(matchDoc.get())
@@ -39,7 +39,7 @@ describe('Firestore Security Rules', () => {
   it('allows anyone to write matches documents under current rules', async () => {
     // Under current wide-open rules, writing is allowed for anyone.
     // In Phase 2, we should restrict this to authenticated admins and assertFails.
-    const context = testEnv.anonymousRulesContext()
+    const context = testEnv.unauthenticatedContext()
     const db = context.firestore()
     const matchDoc = db.collection('matches').doc('test-match')
     await assertSucceeds(matchDoc.set({ 
@@ -51,7 +51,7 @@ describe('Firestore Security Rules', () => {
   })
 
   it('allows anyone to read teams documents', async () => {
-    const context = testEnv.anonymousRulesContext()
+    const context = testEnv.unauthenticatedContext()
     const db = context.firestore()
     const teamDoc = db.collection('teams').doc('test-team')
     await assertSucceeds(teamDoc.get())

@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: 'list',
 
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5176',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -30,8 +30,8 @@ export default defineConfig({
 
   // Run Vite dev server automatically before starting tests
   webServer: {
-    command: 'npx vite',
-    url: 'http://localhost:5173',
+    command: 'npx vite --port 5176',
+    url: 'http://localhost:5176',
     reuseExistingServer: !process.env.CI,
     timeout: 15000,
   },

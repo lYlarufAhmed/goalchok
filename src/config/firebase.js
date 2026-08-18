@@ -30,7 +30,7 @@ export const rtdb = getDatabase(app)
 // Disabled for production - set VITE_USE_EMULATORS=true in .env.local to enable for local dev
 const useEmulators = false
 if (useEmulators) {
-  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  connectFirestoreEmulator(db, '127.0.0.1', 8085)
   connectDatabaseEmulator(rtdb, '127.0.0.1', 9000)
 }
 

@@ -38,21 +38,21 @@ test.describe('Standings Auto-Update Reproduction Test', () => {
 
     // 2. Log in as Admin
     await page.goto('/admin/login')
-    await expect(page.getByRole('heading', { name: 'لوحة التحكم' })).toBeVisible()
+    await expect(page.locator('h1').filter({ hasText: /لوحة التحكم|Admin Panel/ })).toBeVisible()
     
     const pinInput = page.locator('input[type="password"]')
-    await pinInput.fill('1234')
-    await page.getByRole('button', { name: 'دخول' }).click()
+    await pinInput.fill('7391')
+    await page.locator('button[type="submit"]').click()
 
     // Verify successful login
-    await expect(page.getByText('لوحة تحكم بطولة GoalChok-গোলছক')).toBeVisible()
+    await expect(page.getByText(/لوحة تحكم بطولة GoalChok-গোলছক|GoalChok-গোলছক tournament control panel/)).toBeVisible()
 
     // 3. Navigate to Matches Admin Page to find a scheduled match where both teams belong to the same group
     await page.goto('/admin/matches')
-    await expect(page.getByRole('heading', { name: 'إدارة المباريات' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /إدارة المباريات|Match Management/ })).toBeVisible()
 
     // Click Auto-Generate Schedule if visible
-    const autoGenBtn = page.getByRole('button', { name: 'إنشاء الجدول تلقائياً' })
+    const autoGenBtn = page.getByRole('button', { name: /إنشاء الجدول تلقائياً|Auto-Generate Schedule/ })
     if (await autoGenBtn.count() > 0 && await autoGenBtn.isVisible()) {
       console.log('Auto-Generate Schedule button is visible. Clicking it...')
       await autoGenBtn.click()
@@ -70,7 +70,7 @@ test.describe('Standings Auto-Update Reproduction Test', () => {
     for (let i = 0; i < count; i++) {
       const card = cards.nth(i)
       const statusText = await card.locator('span').first().textContent()
-      if (statusText.includes('مجدولة')) {
+      if (statusText.includes('مجدولة') || statusText.includes('Scheduled')) {
         const pElements = card.locator('p')
         const t1 = await pElements.nth(0).textContent()
         const t2 = await pElements.nth(1).textContent()
@@ -137,7 +137,7 @@ test.describe('Standings Auto-Update Reproduction Test', () => {
 
     // 5. Return to Matches Admin Page to record result
     await page.goto('/admin/matches')
-    await expect(page.getByRole('heading', { name: 'إدارة المباريات' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /إدارة المباريات|Match Management/ })).toBeVisible()
 
     // Re-locate the specific target card by team names
     const matchCard = page.locator('.glass-card').filter({
@@ -149,11 +149,11 @@ test.describe('Standings Auto-Update Reproduction Test', () => {
     await expect(matchCard).toBeVisible()
 
     // Click "Record Result" on that card
-    const recordResultBtn = matchCard.getByRole('button', { name: 'تسجيل النتيجة' })
+    const recordResultBtn = matchCard.getByRole('button', { name: /تسجيل النتيجة|Record Result/ })
     await recordResultBtn.click()
 
     // Result modal should open
-    await expect(page.getByRole('heading', { name: 'تسجيل النتيجة' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /تسجيل النتيجة|Record Result/ })).toBeVisible()
 
     // Fill score A = 4, score B = 2
     const scoreInputs = page.locator('form input[type="number"]')
@@ -163,11 +163,11 @@ test.describe('Standings Auto-Update Reproduction Test', () => {
     await scoreInputs.last().fill('2')
 
     // Click "Save Result" to submit
-    await page.getByRole('button', { name: 'حفظ النتيجة' }).click()
+    await page.getByRole('button', { name: /حفظ النتيجة|Save Result/ }).click()
 
     // Wait for modal to close and match status to become "Completed"
-    await expect(page.getByRole('heading', { name: 'تسجيل النتيجة' })).not.toBeVisible()
-    await expect(matchCard.locator('span', { hasText: 'منتهية' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /تسجيل النتيجة|Record Result/ }).not.toBeVisible())
+    await expect(matchCard.locator('span', { hasText: /منتهية|Completed/ })).toBeVisible()
     await expect(matchCard.locator('span', { hasText: '4 - 2' })).toBeVisible()
 
     // 6. Navigate back to standings to verify auto-update
