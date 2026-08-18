@@ -8,8 +8,10 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import { MatchLifecycleService } from '../domain/matchLifecycleService'
 
 const COLLECTION = 'matches'
+const lifecycleService = new MatchLifecycleService()
 
 export async function fetchMatches() {
   const snapshot = await getDocs(collection(db, COLLECTION))
@@ -83,21 +85,10 @@ export async function deleteMatchDoc(id) {
 }
 
 export async function saveMatchResult(id, result, status = 'completed') {
+  const validatedResult = lifecycleService.validateResultPayload(result)
   const payload = stripUndefined({
     status,
-    result: {
-      scoreA: Number(result.scoreA) || 0,
-      scoreB: Number(result.scoreB) || 0,
-      scorers: (result.scorers || []).map((s) =>
-        stripUndefined({
-          player: s.player,
-          teamId: s.teamId,
-          minute: s.minute != null && s.minute !== '' ? Number(s.minute) : undefined,
-        })
-      ),
-      yellowCards: (result.yellowCards || []).map((c) => ({ player: c.player, teamId: c.teamId })),
-      redCards: (result.redCards || []).map((c) => ({ player: c.player, teamId: c.teamId })),
-    },
+    result: validatedResult,
   })
   await updateDoc(doc(db, COLLECTION, id), payload)
 }
