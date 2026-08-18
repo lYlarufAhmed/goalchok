@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { haptic } from '../../../hooks/useHaptics'
@@ -21,52 +21,69 @@ const SHEET_ROUND     = 'round'
 const SHEET_TEAM_A    = 'teamA'
 const SHEET_TEAM_B    = 'teamB'
 
-export default function MatchFormModal({ isOpen, onClose, onSubmitGroup, onSubmitKnockout }) {
-  const teams = useTeamsStore((state) => state.teams)
+export default function MatchFormModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  onSubmitGroup,
+  onSubmitKnockout,
+  match = null,
+  teams: propTeams = null,
+  initialType = 'group',
+  mode = 'full', // 'full' | 'schedule'
+  title = null,
+}) {
+  const storeTeams = useTeamsStore((state) => state.teams)
+  const teams = propTeams || storeTeams
   const { t, isAr } = useI18n()
 
-  const [matchType, setMatchType]   = useState('group')
-  const [openSheet, setOpenSheet]   = useState(SHEET_NONE)
+  const defaultType = match?.round ? 'knockout' : initialType
+  const [matchType, setMatchType] = useState(defaultType)
+  const [openSheet, setOpenSheet] = useState(SHEET_NONE)
+  const [prevIsOpen, setPrevIsOpen] = useState(false)
 
   const [form, setForm] = useState({
-    group:  'A',
-    round:  'QF',
-    teamA:  '',
-    teamB:  '',
-    date:   '',
-    time:   '',
-    venue:  '',
+    group: match?.group || 'A',
+    round: match?.round || 'QF',
+    teamA: match?.teamA || '',
+    teamB: match?.teamB || '',
+    date: match?.date || '',
+    time: match?.time || '',
+    venue: match?.venue || (isAr ? 'ملاعب فيا' : 'Via Stadium'),
   })
   const [errors, setErrors] = useState({})
+
+  if (isOpen && !prevIsOpen) {
+    setPrevIsOpen(true)
+    setMatchType(match?.round ? 'knockout' : initialType)
+    setOpenSheet(SHEET_NONE)
+    setForm({
+      group: match?.group || 'A',
+      round: match?.round || 'QF',
+      teamA: match?.teamA || '',
+      teamB: match?.teamB || '',
+      date: match?.date || '',
+      time: match?.time || '',
+      venue: match?.venue || (isAr ? 'ملاعب فيا' : 'Via Stadium'),
+    })
+    setErrors({})
+  } else if (!isOpen && prevIsOpen) {
+    setPrevIsOpen(false)
+  }
 
   const availableTeams = matchType === 'group'
     ? teams.filter((tm) => tm.group === form.group)
     : teams
 
-  useEffect(() => {
-    if (isOpen) {
-      setMatchType('group')
-      setOpenSheet(SHEET_NONE)
-      setForm({
-        group: 'A', round: 'QF', teamA: '', teamB: '',
-        date: '', time: '',
-        venue: isAr ? 'ملاعب فيا' : 'Via Stadium',
-      })
-      setErrors({})
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    setForm((prev) => ({ ...prev, teamA: '', teamB: '' }))
-  }, [form.group, form.round])
-
   const validate = () => {
     const nextErrors = {}
-    if (!form.teamA) nextErrors.teamA = t('matches.team1Required')
-    if (!form.teamB) nextErrors.teamB = t('matches.team2Required')
-    if (form.teamA && form.teamA === form.teamB) nextErrors.teamB = t('matches.sameTeamError')
-    if (!form.date)  nextErrors.date  = t('matches.dateRequired')
-    if (!form.time)  nextErrors.time  = t('matches.timeRequired')
+    if (mode === 'full') {
+      if (!form.teamA) nextErrors.teamA = t('matches.team1Required')
+      if (!form.teamB) nextErrors.teamB = t('matches.team2Required')
+      if (form.teamA && form.teamA === form.teamB) nextErrors.teamB = t('matches.sameTeamError')
+    }
+    if (!form.date) nextErrors.date = t('matches.dateRequired')
+    if (!form.time) nextErrors.time = t('matches.timeRequired')
     if (!form.venue.trim()) nextErrors.venue = t('matches.venueRequired')
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -76,7 +93,15 @@ export default function MatchFormModal({ isOpen, onClose, onSubmitGroup, onSubmi
     e.preventDefault()
     if (!validate()) return
     haptic.intense()
-    if (matchType === 'group') {
+
+    const payload = {
+      ...form,
+      venue: form.venue.trim(),
+    }
+
+    if (onSubmit) {
+      onSubmit(payload)
+    } else if (matchType === 'group') {
       onSubmitGroup?.({ group: form.group, teamA: form.teamA, teamB: form.teamB, date: form.date, time: form.time, venue: form.venue })
     } else {
       onSubmitKnockout?.({ round: form.round, teamA: form.teamA, teamB: form.teamB, date: form.date, time: form.time, venue: form.venue })
@@ -84,7 +109,7 @@ export default function MatchFormModal({ isOpen, onClose, onSubmitGroup, onSubmi
     onClose()
   }
 
-  // ---------- Option arrays ----------
+  // Option arrays
   const matchTypeOptions = [
     { value: 'group',    label: isAr ? 'مرحلة المجموعات'       : 'Group Stage' },
     { value: 'knockout', label: isAr ? 'مرحلة خروج المغلوب'    : 'Knockout Stage' },
@@ -108,14 +133,18 @@ export default function MatchFormModal({ isOpen, onClose, onSubmitGroup, onSubmi
       label: tm.group ? `${tm.name} (${tm.group})` : tm.name,
     }))
 
-  const selectedTeamALabel = teamOptions.find((o) => o.value === form.teamA)?.label
-  const selectedTeamBLabel = teamBOptions.find((o) => o.value === form.teamB)?.label
+  const modalTitle = title || (
+    mode === 'schedule'
+      ? t('knockout.editMatch')
+      : match
+        ? t('knockout.editMatchTitle')
+        : t('matches.addMatchTitle')
+  )
 
   return (
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-          {/* Main backdrop – only close modal when no sheet is open */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -132,7 +161,7 @@ export default function MatchFormModal({ isOpen, onClose, onSubmitGroup, onSubmi
           >
             {/* Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-border bg-bg-card/95 backdrop-blur-md">
-              <h2 className="text-lg font-bold">{t('matches.addMatchTitle')}</h2>
+              <h2 className="text-lg font-bold">{modalTitle}</h2>
               <button
                 type="button"
                 onClick={onClose}
@@ -144,80 +173,86 @@ export default function MatchFormModal({ isOpen, onClose, onSubmitGroup, onSubmi
 
             <form onSubmit={handleSubmit} className="p-4 space-y-4 pb-8" dir={isAr ? 'rtl' : 'ltr'}>
 
-              {/* ── Match Type ── */}
-              <SelectBottomSheet
-                label={isAr ? 'نوع المباراة' : 'Match Type'}
-                value={matchType}
-                onChange={(v) => {
-                  setMatchType(v)
-                  setForm((prev) => ({ ...prev, teamA: '', teamB: '' }))
-                }}
-                options={matchTypeOptions}
-                isOpen={openSheet === SHEET_TYPE}
-                onOpen={() => setOpenSheet(SHEET_TYPE)}
-                onClose={() => setOpenSheet(SHEET_NONE)}
-                isAr={isAr}
-              />
-
-              {/* ── Group / Round ── */}
-              {matchType === 'group' ? (
+              {mode === 'full' && (
                 <>
+                  {/* Match Type */}
+                  {!match && (
+                    <SelectBottomSheet
+                      label={isAr ? 'نوع المباراة' : 'Match Type'}
+                      value={matchType}
+                      onChange={(v) => {
+                        setMatchType(v)
+                        setForm((prev) => ({ ...prev, teamA: '', teamB: '' }))
+                      }}
+                      options={matchTypeOptions}
+                      isOpen={openSheet === SHEET_TYPE}
+                      onOpen={() => setOpenSheet(SHEET_TYPE)}
+                      onClose={() => setOpenSheet(SHEET_NONE)}
+                      isAr={isAr}
+                    />
+                  )}
+
+                  {/* Group / Round */}
+                  {matchType === 'group' ? (
+                    <>
+                      <SelectBottomSheet
+                        label={t('matches.group')}
+                        value={form.group}
+                        onChange={(v) => setForm((prev) => ({ ...prev, group: v }))}
+                        options={groupOptions}
+                        isOpen={openSheet === SHEET_GROUP}
+                        onOpen={() => setOpenSheet(SHEET_GROUP)}
+                        onClose={() => setOpenSheet(SHEET_NONE)}
+                        isAr={isAr}
+                      />
+                      {availableTeams.length < 2 && (
+                        <p className="text-xs text-warning -mt-2">{t('matches.needDrawFirst')}</p>
+                      )}
+                    </>
+                  ) : (
+                    <SelectBottomSheet
+                      label={isAr ? 'الدور' : 'Round'}
+                      value={form.round}
+                      onChange={(v) => setForm((prev) => ({ ...prev, round: v }))}
+                      options={roundOptions}
+                      isOpen={openSheet === SHEET_ROUND}
+                      onOpen={() => setOpenSheet(SHEET_ROUND)}
+                      onClose={() => setOpenSheet(SHEET_NONE)}
+                      isAr={isAr}
+                    />
+                  )}
+
+                  {/* Team A */}
                   <SelectBottomSheet
-                    label={t('matches.group')}
-                    value={form.group}
-                    onChange={(v) => setForm((prev) => ({ ...prev, group: v }))}
-                    options={groupOptions}
-                    isOpen={openSheet === SHEET_GROUP}
-                    onOpen={() => setOpenSheet(SHEET_GROUP)}
+                    label={t('matches.team1')}
+                    value={form.teamA}
+                    onChange={(v) => setForm((prev) => ({ ...prev, teamA: v }))}
+                    options={teamOptions}
+                    placeholder={t('matches.selectTeam')}
+                    isOpen={openSheet === SHEET_TEAM_A}
+                    onOpen={() => setOpenSheet(SHEET_TEAM_A)}
                     onClose={() => setOpenSheet(SHEET_NONE)}
                     isAr={isAr}
                   />
-                  {availableTeams.length < 2 && (
-                    <p className="text-xs text-warning -mt-2">{t('matches.needDrawFirst')}</p>
-                  )}
+                  {errors.teamA && <p className="text-xs text-danger -mt-2">{errors.teamA}</p>}
+
+                  {/* Team B */}
+                  <SelectBottomSheet
+                    label={t('matches.team2')}
+                    value={form.teamB}
+                    onChange={(v) => setForm((prev) => ({ ...prev, teamB: v }))}
+                    options={teamBOptions}
+                    placeholder={t('matches.selectTeam')}
+                    isOpen={openSheet === SHEET_TEAM_B}
+                    onOpen={() => setOpenSheet(SHEET_TEAM_B)}
+                    onClose={() => setOpenSheet(SHEET_NONE)}
+                    isAr={isAr}
+                  />
+                  {errors.teamB && <p className="text-xs text-danger -mt-2">{errors.teamB}</p>}
                 </>
-              ) : (
-                <SelectBottomSheet
-                  label={isAr ? 'الدور' : 'Round'}
-                  value={form.round}
-                  onChange={(v) => setForm((prev) => ({ ...prev, round: v }))}
-                  options={roundOptions}
-                  isOpen={openSheet === SHEET_ROUND}
-                  onOpen={() => setOpenSheet(SHEET_ROUND)}
-                  onClose={() => setOpenSheet(SHEET_NONE)}
-                  isAr={isAr}
-                />
               )}
 
-              {/* ── Team A ── */}
-              <SelectBottomSheet
-                label={t('matches.team1')}
-                value={form.teamA}
-                onChange={(v) => setForm((prev) => ({ ...prev, teamA: v }))}
-                options={teamOptions}
-                placeholder={t('matches.selectTeam')}
-                isOpen={openSheet === SHEET_TEAM_A}
-                onOpen={() => setOpenSheet(SHEET_TEAM_A)}
-                onClose={() => setOpenSheet(SHEET_NONE)}
-                isAr={isAr}
-              />
-              {errors.teamA && <p className="text-xs text-danger -mt-2">{errors.teamA}</p>}
-
-              {/* ── Team B ── */}
-              <SelectBottomSheet
-                label={t('matches.team2')}
-                value={form.teamB}
-                onChange={(v) => setForm((prev) => ({ ...prev, teamB: v }))}
-                options={teamBOptions}
-                placeholder={t('matches.selectTeam')}
-                isOpen={openSheet === SHEET_TEAM_B}
-                onOpen={() => setOpenSheet(SHEET_TEAM_B)}
-                onClose={() => setOpenSheet(SHEET_NONE)}
-                isAr={isAr}
-              />
-              {errors.teamB && <p className="text-xs text-danger -mt-2">{errors.teamB}</p>}
-
-              {/* ── Date & Time ── */}
+              {/* Date & Time */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm text-text-secondary mb-2">
@@ -247,7 +282,7 @@ export default function MatchFormModal({ isOpen, onClose, onSubmitGroup, onSubmi
                 </div>
               </div>
 
-              {/* ── Venue ── */}
+              {/* Venue */}
               <div>
                 <label className="block text-sm text-text-secondary mb-2">
                   {t('matches.venue')}
@@ -262,13 +297,13 @@ export default function MatchFormModal({ isOpen, onClose, onSubmitGroup, onSubmi
                 {errors.venue && <p className="text-xs text-danger mt-1">{errors.venue}</p>}
               </div>
 
-              {/* ── Submit ── */}
+              {/* Submit */}
               <button
                 type="submit"
-                disabled={matchType === 'group' && availableTeams.length < 2}
+                disabled={mode === 'full' && matchType === 'group' && availableTeams.length < 2}
                 className="w-full bg-accent hover:bg-accent-hover text-black font-bold py-3.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {t('matches.addMatchTitle')}
+                {match ? t('common.save') : modalTitle}
               </button>
             </form>
           </motion.div>

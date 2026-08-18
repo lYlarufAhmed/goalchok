@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2, ChevronDown, Target, AlertCircle } from 'lucide-react'
 import { emptyResult } from '../../../stores/useMatchesStore'
 import { useI18n } from '../../../i18n/useI18n'
 import { haptic } from '../../../hooks/useHaptics'
+import TeamLogo from '../../../components/common/TeamLogo'
 
 const emptyScorer = { player: '', minute: '', teamId: '', goalsCount: '1' }
 const emptyCard = { player: '', teamId: '' }
@@ -100,112 +101,135 @@ function CardEventsSection({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden"
+            className="border-t border-border/60 p-3.5 space-y-3 bg-bg-primary/30"
           >
             {items.length === 0 ? (
-              <div className="px-3 pb-3">
-                <div className="rounded-xl border border-dashed border-border p-4 flex flex-col items-center gap-2 text-text-secondary">
-                  <span className="text-xs">{noEventsLabel}</span>
-                </div>
-              </div>
+              <p className="text-xs text-text-secondary text-center py-2 italic">
+                {noEventsLabel}
+              </p>
             ) : (
-              <div className="px-3 pb-3 space-y-2">
-                {items.map((item, index) => (
+              items.map((item, index) => {
+                const teamPlayers = getTeamPlayers(item.teamId)
+                const isSelectedTeamValid = item.teamId === teamA?.id || item.teamId === teamB?.id
+                const pErr = fieldError(index, 'player')
+                const tErr = fieldError(index, 'teamId')
+                const gErr = fieldError(index, 'goalsCount')
+
+                return (
                   <motion.div
                     key={index}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex gap-2 items-start bg-bg-primary/80 rounded-xl p-2.5 border border-border/60"
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="p-3 rounded-xl bg-bg-surface/80 border border-border/80 space-y-2.5 shadow-sm"
                   >
-                    <div className={`flex-1 grid grid-cols-1 ${variant === 'scorer' ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-2 min-w-0`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[10px] text-text-secondary mb-1 block">{teamLabel}</label>
+                        <label className="block text-[10px] font-medium text-text-secondary mb-1">
+                          {teamLabel}
+                        </label>
                         <select
                           value={item.teamId}
-                          onChange={(e) => updateItem(index, 'teamId', e.target.value)}
-                          className={`w-full bg-bg-surface border rounded-lg py-2 px-2 text-xs focus:outline-none focus:border-accent appearance-none ${
-                            fieldError(index, 'teamId') ? 'border-danger ring-1 ring-danger/30' : 'border-border'
+                          onChange={(e) => {
+                            haptic.light()
+                            updateItem(index, 'teamId', e.target.value)
+                            updateItem(index, 'player', '')
+                          }}
+                          className={`w-full text-xs font-medium bg-bg-primary border rounded-lg px-2.5 py-2 text-text-primary focus:outline-none focus:border-accent ${
+                            tErr ? 'border-danger' : 'border-border'
                           }`}
                         >
-                          <option value="">{teamLabel}</option>
+                          <option value="">-- اختر الفريق --</option>
                           {teamA && <option value={teamA.id}>{teamA.name}</option>}
                           {teamB && <option value={teamB.id}>{teamB.name}</option>}
                         </select>
-                        {fieldError(index, 'teamId') && (
-                          <p className="text-[10px] text-danger mt-0.5">{fieldError(index, 'teamId')}</p>
-                        )}
+                        {tErr && <p className="text-[10px] text-danger mt-0.5">{tErr}</p>}
                       </div>
 
                       <div>
-                        <label className="text-[10px] text-text-secondary mb-1 block">{playerLabel}</label>
+                        <label className="block text-[10px] font-medium text-text-secondary mb-1">
+                          {playerLabel}
+                        </label>
                         <select
                           value={item.player}
-                          onChange={(e) => updateItem(index, 'player', e.target.value)}
-                          disabled={!item.teamId}
-                          className={`w-full bg-bg-surface border rounded-lg py-2 px-2 text-xs focus:outline-none focus:border-accent disabled:opacity-40 appearance-none ${
-                            fieldError(index, 'player') ? 'border-danger ring-1 ring-danger/30' : 'border-border'
+                          disabled={!isSelectedTeamValid}
+                          onChange={(e) => {
+                            haptic.light()
+                            updateItem(index, 'player', e.target.value)
+                          }}
+                          className={`w-full text-xs font-medium bg-bg-primary border rounded-lg px-2.5 py-2 text-text-primary focus:outline-none focus:border-accent disabled:opacity-40 ${
+                            pErr ? 'border-danger' : 'border-border'
                           }`}
                         >
-                          <option value="">{playerLabel}</option>
-                          {getTeamPlayers(item.teamId).map((p) => (
-                            <option key={p.id} value={p.name}>
-                              {p.name}
+                          <option value="">
+                            {!isSelectedTeamValid ? '-- اختر الفريق أولاً --' : '-- اختر اللاعب --'}
+                          </option>
+                          {teamPlayers.map((p, pIdx) => (
+                            <option key={pIdx} value={p.name}>
+                              #{p.number} {p.name}
                             </option>
                           ))}
                         </select>
-                        {fieldError(index, 'player') && (
-                          <p className="text-[10px] text-danger mt-0.5">{fieldError(index, 'player')}</p>
-                        )}
+                        {pErr && <p className="text-[10px] text-danger mt-0.5">{pErr}</p>}
                       </div>
-
-                      {variant === 'scorer' && (
-                        <>
-                          <div>
-                            <label className="text-[10px] text-text-secondary mb-1 block">عدد الأهداف (اختياري)</label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={item.goalsCount || '1'}
-                              onChange={(e) => {
-                                haptic.light()
-                                updateItem(index, 'goalsCount', e.target.value)
-                              }}
-                              className={`w-full bg-bg-surface border rounded-lg py-2 px-2 text-xs text-center focus:outline-none focus:border-accent ${
-                                fieldError(index, 'goalsCount') ? 'border-danger ring-1 ring-danger/30' : 'border-border'
-                              }`}
-                              dir="ltr"
-                            />
-                            {fieldError(index, 'goalsCount') && (
-                              <p className="text-[10px] text-danger mt-0.5">{fieldError(index, 'goalsCount')}</p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-text-secondary mb-1 block">الدقيقة (اختياري)</label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="120"
-                              value={item.minute || ''}
-                              onChange={(e) => updateItem(index, 'minute', e.target.value)}
-                              placeholder="مثال: 15"
-                              className="w-full bg-bg-surface border border-border rounded-lg py-2 px-2 text-xs text-center focus:outline-none focus:border-accent"
-                              dir="ltr"
-                            />
-                          </div>
-                        </>
-                      )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => removeItem(index)}
-                      className="w-9 h-9 rounded-lg bg-bg-surface border border-border/60 flex items-center justify-center text-danger/70 hover:text-danger hover:bg-danger/5 shrink-0 transition-colors mt-5"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {variant === 'scorer' && (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40">
+                        <div>
+                          <label className="block text-[10px] font-medium text-text-secondary mb-1">
+                            عدد الأهداف
+                          </label>
+                          <select
+                            value={item.goalsCount || '1'}
+                            onChange={(e) => {
+                              haptic.light()
+                              updateItem(index, 'goalsCount', e.target.value)
+                            }}
+                            className={`w-full text-xs font-medium bg-bg-primary border rounded-lg px-2.5 py-2 text-text-primary focus:outline-none focus:border-accent ${
+                              gErr ? 'border-danger' : 'border-border'
+                            }`}
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                              <option key={num} value={num}>
+                                {num} {num === 1 ? 'هدف' : num === 2 ? 'هدفان' : 'أهداف'}
+                              </option>
+                            ))}
+                          </select>
+                          {gErr && <p className="text-[10px] text-danger mt-0.5">{gErr}</p>}
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-medium text-text-secondary mb-1">
+                            {minuteLabel}
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="120"
+                            placeholder="مثال: 15"
+                            value={item.minute}
+                            onChange={(e) => updateItem(index, 'minute', e.target.value)}
+                            className="w-full text-xs bg-bg-primary border border-border rounded-lg px-2.5 py-2 text-text-primary focus:outline-none focus:border-accent"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={() => removeItem(index)}
+                        className="text-xs text-danger/80 hover:text-danger flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-danger/10"
+                      >
+                        <Trash2 size={13} />
+                        <span>حذف</span>
+                      </button>
+                    </div>
                   </motion.div>
-                ))}
-              </div>
+                )
+              })
             )}
           </motion.div>
         )}
@@ -216,19 +240,17 @@ function CardEventsSection({
 
 function YellowIcon({ size = 16 }) {
   return (
-    <span
-      className="inline-block rounded-sm border border-yellow-500/50 bg-yellow-400/90"
-      style={{ width: size * 0.65, height: size }}
-    />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="5" y="3" width="14" height="18" rx="2" fill="#EAB308" />
+    </svg>
   )
 }
 
 function RedIcon({ size = 16 }) {
   return (
-    <span
-      className="inline-block rounded-sm border border-red-500/50 bg-red-500/90"
-      style={{ width: size * 0.65, height: size }}
-    />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="5" y="3" width="14" height="18" rx="2" fill="#EF4444" />
+    </svg>
   )
 }
 
@@ -237,14 +259,6 @@ function validateEventRows(items, variant, t) {
   let hasIncomplete = false
 
   items.forEach((item, index) => {
-    const hasAny =
-      variant === 'scorer'
-        ? item.player || item.minute || item.goalsCount
-        : item.teamId || item.player
-    // Scorer row with only team selected — counts toward score, skip field validation
-    if (variant === 'scorer' && !hasAny && item.teamId) return
-    if (!hasAny) return
-
     const prefix = `${variant}-${index}`
     if (!item.teamId) {
       errors[`${prefix}-teamId`] = t('matches.teamRequired')
@@ -284,10 +298,20 @@ function syncScoresFromScorers(scorers, teamA, teamB, currentScoreA, currentScor
   }
 }
 
-export default function ResultFormModal({ isOpen, onClose, onSubmit, match, teamA, teamB }) {
+export default function ResultFormModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  match,
+  teamA,
+  teamB,
+  isKnockout = Boolean(match?.round),
+}) {
   const [form, setForm] = useState(emptyResult)
+  const [penaltyWinner, setPenaltyWinner] = useState(null)
   const [errors, setErrors] = useState({})
   const [fieldErrors, setFieldErrors] = useState({})
+  const [prevMatch, setPrevMatch] = useState(null)
   const { t, isAr } = useI18n()
 
   const mapScorers = (items = []) => items.map(item => ({
@@ -299,28 +323,43 @@ export default function ResultFormModal({ isOpen, onClose, onSubmit, match, team
 
   const mapCards = (items = []) => items.map((item) => ({ player: item.player || '', teamId: item.teamId || '' }))
 
-  useEffect(() => {
-    if (isOpen && match) {
-      setForm(
-        match.result
-          ? {
-              scoreA: match.result.scoreA,
-              scoreB: match.result.scoreB,
-              scorers: mapScorers(match.result.scorers),
-              yellowCards: mapCards(match.result.yellowCards),
-              redCards: mapCards(match.result.redCards),
-            }
-          : { ...emptyResult, scorers: [], yellowCards: [], redCards: [] }
-      )
-      setErrors({})
-      setFieldErrors({})
-    }
-  }, [isOpen, match])
+  if (isOpen && match && prevMatch !== match) {
+    setPrevMatch(match)
+    setForm(
+      match.result
+        ? {
+            scoreA: match.result.scoreA,
+            scoreB: match.result.scoreB,
+            scorers: mapScorers(match.result.scorers),
+            yellowCards: mapCards(match.result.yellowCards),
+            redCards: mapCards(match.result.redCards),
+          }
+        : { ...emptyResult, scorers: [], yellowCards: [], redCards: [] }
+    )
+    setPenaltyWinner(match.result?.penaltyWinner || null)
+    setErrors({})
+    setFieldErrors({})
+  } else if (!isOpen && prevMatch) {
+    setPrevMatch(null)
+  }
+
+  const isTied = useMemo(() => {
+    if (!isKnockout) return false
+    const sA = Number(form.scoreA)
+    const sB = Number(form.scoreB)
+    return !isNaN(sA) && !isNaN(sB) && sA === sB
+  }, [form.scoreA, form.scoreB, isKnockout])
 
   const validationState = useMemo(() => {
     const nextErrors = {}
     if (form.scoreA === '' || form.scoreA < 0) nextErrors.scoreA = t('common.required')
     if (form.scoreB === '' || form.scoreB < 0) nextErrors.scoreB = t('common.required')
+
+    if (isTied && !penaltyWinner) {
+      nextErrors.penalty = isAr
+        ? 'يجب تحديد الفائز بركلات الترجيح عند التعادل'
+        : 'Penalty winner required when scores are tied'
+    }
 
     const scorerVal = validateEventRows(form.scorers, 'scorer', t)
     const yellowVal = validateEventRows(form.yellowCards, 'yellow', t)
@@ -339,7 +378,7 @@ export default function ResultFormModal({ isOpen, onClose, onSubmit, match, team
       !redVal.hasIncomplete
 
     return { nextErrors, allFieldErrors, isValid }
-  }, [form, t])
+  }, [form, isTied, penaltyWinner, t, isAr])
 
   const cleanScorers = (items) => {
     const flatScorers = []
@@ -385,6 +424,7 @@ export default function ResultFormModal({ isOpen, onClose, onSubmit, match, team
     onSubmit({
       scoreA: synced.scoreA,
       scoreB: synced.scoreB,
+      penaltyWinner: isTied ? penaltyWinner : null,
       scorers: cleanScorers(form.scorers),
       yellowCards: cleanCards(form.yellowCards),
       redCards: cleanCards(form.redCards),
@@ -482,6 +522,81 @@ export default function ResultFormModal({ isOpen, onClose, onSubmit, match, team
                   </div>
                 </div>
               </div>
+
+              {/* Penalty Winner — appears only when tied in knockout matches */}
+              <AnimatePresence>
+                {isTied && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.2 }}
+                    className={`rounded-2xl border p-4 space-y-3 ${
+                      errors.penalty
+                        ? 'border-danger/50 bg-danger/5'
+                        : 'border-accent/30 bg-accent/5'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-bold flex items-center gap-2">
+                        <span className="text-lg">🏆</span>
+                        {isAr ? 'الفائز بركلات الترجيح' : 'Penalty Winner'}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-0.5">
+                        {isAr
+                          ? 'انتهت المباراة بالتعادل. اختر الفريق الفائز بركلات الترجيح:'
+                          : 'Match ended in a draw. Select the penalty shootout winner:'}
+                      </p>
+                    </div>
+
+                    {errors.penalty && (
+                      <div className="flex items-center gap-2 text-xs text-danger">
+                        <AlertCircle size={14} />
+                        <span>{errors.penalty}</span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { team: teamA, id: teamA?.id },
+                        { team: teamB, id: teamB?.id },
+                      ].map(({ team, id }) => {
+                        const isSelected = penaltyWinner === id
+                        return (
+                          <motion.button
+                            key={id}
+                            type="button"
+                            whileTap={{ scale: 0.96 }}
+                            onClick={() => {
+                              haptic.medium()
+                              setPenaltyWinner(id)
+                            }}
+                            className={`flex flex-col items-center gap-2.5 p-3.5 rounded-2xl border-2 transition-all ${
+                              isSelected
+                                ? 'border-accent bg-accent/15 shadow-lg shadow-accent/10'
+                                : 'border-border bg-bg-surface hover:border-accent/40'
+                            }`}
+                          >
+                            <TeamLogo logo={team?.logo} name={team?.name} color={team?.color} size="md" />
+                            <p className={`text-sm font-bold text-center leading-tight ${isSelected ? 'text-accent' : ''}`}>
+                              {team?.name}
+                            </p>
+                            {isSelected && (
+                              <motion.span
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="text-[10px] bg-accent text-black px-2 py-0.5 rounded-full font-bold"
+                              >
+                                {isAr ? 'الفائز ✓' : 'Winner ✓'}
+                              </motion.span>
+                            )}
+                          </motion.button>
+                        )
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <CardEventsSection
                 title={t('matches.goals')}
