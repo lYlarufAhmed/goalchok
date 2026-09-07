@@ -1,10 +1,17 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2, ChevronDown, Target, AlertCircle } from 'lucide-react'
-import { emptyResult } from '../../../stores/useMatchesStore'
 import { useI18n } from '../../../i18n/useI18n'
 import { haptic } from '../../../hooks/useHaptics'
 import TeamLogo from '../../../components/common/TeamLogo'
+
+const emptyResult = {
+  scoreA: 0,
+  scoreB: 0,
+  scorers: [],
+  yellowCards: [],
+  redCards: [],
+}
 
 const emptyScorer = { player: '', minute: '', teamId: '', goalsCount: '1' }
 const emptyCard = { player: '', teamId: '' }

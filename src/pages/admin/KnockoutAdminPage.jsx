@@ -4,8 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Trophy, CheckCircle, Lock, AlertCircle, RefreshCw, Plus, ArrowLeft } from 'lucide-react'
 
 import { useKnockoutStore } from '../../stores/useKnockoutStore'
-import { useTeamsStore } from '../../stores/useTeamsStore'
-import { useMatchesStore } from '../../stores/useMatchesStore'
+import { useTeamsQuery, useMatchesQuery } from '../../hooks/useQueries'
 import { isGroupStageComplete, getQualifiedTeams, computeAllStandings } from '../../utils/knockoutUtils'
 import { useI18n } from '../../i18n/useI18n'
 import { haptic } from '../../hooks/useHaptics'
@@ -30,8 +29,8 @@ export default function KnockoutAdminPage() {
   const navigate = useNavigate()
   
   const koStore = useKnockoutStore()
-  const teamsStore = useTeamsStore()
-  const matchesStore = useMatchesStore()
+  const { data: allTeams = [] } = useTeamsQuery()
+  const { data: groupMatches = [] } = useMatchesQuery()
 
   useEffect(() => {
     // Ensure the Firestore listener is active. App.jsx owns the lifecycle,
@@ -39,9 +38,6 @@ export default function KnockoutAdminPage() {
     // shared subscription and break the public-facing pages.
     koStore.listenToFirestore()
   }, [])
-
-  const allTeams = teamsStore.teams || []
-  const groupMatches = matchesStore.matches || []
 
   const qualifiedTeams = koStore.qualifiedTeams || []
   const knockoutMatches = koStore.knockoutMatches || []

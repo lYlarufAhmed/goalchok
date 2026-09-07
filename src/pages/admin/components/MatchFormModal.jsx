@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { haptic } from '../../../hooks/useHaptics'
-import { useTeamsStore } from '../../../stores/useTeamsStore'
+import { useTeamsQuery } from '../../../hooks/useQueries'
 import { useI18n } from '../../../i18n/useI18n'
 import SelectBottomSheet from '../../../components/common/SelectBottomSheet'
 
@@ -33,7 +33,7 @@ export default function MatchFormModal({
   mode = 'full', // 'full' | 'schedule'
   title = null,
 }) {
-  const storeTeams = useTeamsStore((state) => state.teams)
+  const { data: storeTeams = [] } = useTeamsQuery()
   const teams = propTeams || storeTeams
   const { t, isAr } = useI18n()
 

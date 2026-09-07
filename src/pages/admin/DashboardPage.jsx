@@ -2,15 +2,15 @@ import { Users, Calendar, Shuffle, Clock, Swords } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import DarkCard from '../../components/common/DarkCard'
-import { useTeamsStore, MAX_TEAMS, isDrawComplete } from '../../stores/useTeamsStore'
-import { useMatchesStore } from '../../stores/useMatchesStore'
+import { useTeamsQuery, useMatchesQuery } from '../../hooks/useQueries'
+import { MAX_TEAMS, isDrawComplete } from '../../stores/useTeamsStore' // Keep helpers if needed for now
 import { useI18n } from '../../i18n/useI18n'
 import { haptic } from '../../hooks/useHaptics'
 
 export default function DashboardPage() {
-  const teams = useTeamsStore((state) => state.teams)
-  const drawLocked = useTeamsStore((state) => state.drawLocked)
-  const matches = useMatchesStore((state) => state.matches)
+  const { data: teams = [] } = useTeamsQuery()
+  const { data: matches = [] } = useMatchesQuery()
+  const drawLocked = false; // TODO: migrate drawLocked state from store to DB/Settings
   const drawComplete = isDrawComplete(teams, drawLocked)
   const { t, isAr } = useI18n()
 

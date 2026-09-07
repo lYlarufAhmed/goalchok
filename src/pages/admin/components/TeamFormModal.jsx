@@ -5,13 +5,14 @@ import { MAX_PLAYERS } from '../../../stores/useTeamsStore'
 import { useI18n } from '../../../i18n/useI18n'
 import { haptic } from '../../../hooks/useHaptics'
 import { TEAM_COLORS, getRandomTeamColor } from '../../../utils/teamColors'
+import { generateUUID } from '../../../utils/uuid'
 
 import ImageCropperModal from '../../../components/common/ImageCropperModal'
 
 const emptyForm = {
   name: '',
   manager: '',
-  players: [{ key: crypto.randomUUID(), value: '' }],
+  players: [{ key: generateUUID(), value: '' }],
   logo: null,
   color: null,
   group: '',
@@ -40,8 +41,8 @@ export default function TeamFormModal({ isOpen, onClose, onSubmit, team, maxTeam
           name: team.name || '',
           manager: team.manager || '',
           players: team.players?.length > 0
-            ? team.players.map((p) => ({ key: crypto.randomUUID(), value: p?.name || '' }))
-            : [{ key: crypto.randomUUID(), value: '' }],
+            ? team.players.map((p) => ({ key: generateUUID(), value: p?.name || '' }))
+            : [{ key: generateUUID(), value: '' }],
           logo: team.logo || null,
           color: team.color || getRandomTeamColor(existingColors).id,
           group: team.group || '',
@@ -121,7 +122,7 @@ export default function TeamFormModal({ isOpen, onClose, onSubmit, team, maxTeam
   const addPlayerField = () => {
     haptic.light()
     if (form.players.length >= MAX_PLAYERS) return
-    setForm((prev) => ({ ...prev, players: [...prev.players, { key: crypto.randomUUID(), value: '' }] }))
+    setForm((prev) => ({ ...prev, players: [...prev.players, { key: generateUUID(), value: '' }] }))
   }
 
   const removePlayerField = (key) => {

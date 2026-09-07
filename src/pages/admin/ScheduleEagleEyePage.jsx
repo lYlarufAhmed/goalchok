@@ -4,8 +4,7 @@ import ScheduleEagleEyeView from '../../components/common/ScheduleEagleEyeView'
 import TournamentBracketView from '../../components/common/TournamentBracketView'
 import LoadingState from '../../components/common/LoadingState'
 import ErrorState from '../../components/common/ErrorState'
-import { useTeamsStore } from '../../stores/useTeamsStore'
-import { useMatchesStore } from '../../stores/useMatchesStore'
+import { useTeamsQuery, useMatchesQuery } from '../../hooks/useQueries'
 import { useAppStore } from '../../stores/useAppStore'
 import { haptic } from '../../hooks/useHaptics'
 
@@ -31,14 +30,8 @@ const t = {
 export default function AdminScheduleEagleEyePage() {
   const lang = useAppStore((s) => s.language)
   const [view, setView] = useState('table')
-  const teams = useTeamsStore((s) => s.teams)
-  const matches = useMatchesStore((s) => s.matches)
-  const teamsLoading = useTeamsStore((s) => !s.initialized)
-  const matchesLoading = useMatchesStore((s) => !s.initialized)
-  const teamsFetchError = useTeamsStore((s) => s.fetchError)
-  const matchesFetchError = useMatchesStore((s) => s.fetchError)
-  const fetchTeams = useTeamsStore((s) => s.fetchAll)
-  const fetchMatches = useMatchesStore((s) => s.fetchAll)
+  const { data: teams = [], isLoading: teamsLoading, isError: teamsFetchError, refetch: fetchTeams } = useTeamsQuery()
+  const { data: matches = [], isLoading: matchesLoading, isError: matchesFetchError, refetch: fetchMatches } = useMatchesQuery()
 
   const isLoading = teamsLoading || matchesLoading
   const isError = teamsFetchError || matchesFetchError

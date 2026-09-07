@@ -93,7 +93,41 @@ export function useTeamMutations() {
     mutationFn: (id) => teamsService.deleteTeamDoc(orgId, tournamentId, id),
     onSuccess: invalidate,
   })
-  return { createTeam, updateTeam, deleteTeam }
+  const assignGroups = useMutation({
+    mutationFn: async (groups) => {
+      // TODO: migrate groupsService to multi-tenant
+      await groupsService.saveGroups(groups)
+      
+      const groupMap = {}
+      Object.entries(groups).forEach(([group, teamIds]) => {
+        if (group === 'locked') return
+        teamIds.forEach((teamId) => {
+          groupMap[teamId] = group
+        })
+      })
+      await teamsService.updateTeamGroups(orgId, tournamentId, groupMap)
+      
+      // TODO: migrate settingsService to multi-tenant
+      await settingsService.updateSettings({ drawLocked: true })
+    },
+    onSuccess: invalidate,
+  })
+
+  const clearGroups = useMutation({
+    mutationFn: async (teams) => {
+      // TODO: migrate groupsService to multi-tenant
+      await groupsService.clearGroupsDoc()
+      
+      const teamIds = teams.map((t) => t.id)
+      await teamsService.clearAllTeamGroups(orgId, tournamentId, teamIds)
+      
+      // TODO: migrate settingsService to multi-tenant
+      await settingsService.updateSettings({ drawLocked: false })
+    },
+    onSuccess: invalidate,
+  })
+
+  return { createTeam, updateTeam, deleteTeam, assignGroups, clearGroups }
 }
 
 export function useMatchMutations() {
@@ -111,5 +145,41 @@ export function useMatchMutations() {
     mutationFn: (id) => matchesService.deleteMatchDoc(orgId, tournamentId, id),
     onSuccess: invalidate,
   })
-  return { createMatch, saveResult, deleteMatch }
+  const updateMatchSchedule = useMutation({
+    mutationFn: ({ id, data }) => matchesService.updateMatchDoc(orgId, tournamentId, id, data),
+    onSuccess: invalidate,
+  })
+  const setMatchLive = useMutation({
+    mutationFn: (id) => matchesService.updateMatchDoc(orgId, tournamentId, id, { status: 'live' }),
+    onSuccess: invalidate,
+  })
+  const updateLiveScore = useMutation({
+    mutationFn: ({ id, scoreA, scoreB, events }) => 
+      matchesService.updateMatchDoc(orgId, tournamentId, id, { result: { scoreA, scoreB, events } }),
+    onSuccess: invalidate,
+  })
+  const postponeMatch = useMutation({
+    mutationFn: (id) => matchesService.setMatchPostponed(orgId, tournamentId, id),
+    onSuccess: invalidate,
+  })
+  const restoreMatch = useMutation({
+    mutationFn: (id) => matchesService.restoreMatchScheduled(orgId, tournamentId, id),
+    onSuccess: invalidate,
+  })
+  const generateSchedule = useMutation({
+    mutationFn: (matchesList) => matchesService.bulkCreateMatches(orgId, tournamentId, matchesList),
+    onSuccess: invalidate,
+  })
+
+  return { 
+    createMatch, 
+    saveResult, 
+    deleteMatch,
+    updateMatchSchedule,
+    setMatchLive,
+    updateLiveScore,
+    postponeMatch,
+    restoreMatch,
+    generateSchedule
+  }
 }

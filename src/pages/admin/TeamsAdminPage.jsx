@@ -5,17 +5,16 @@ import { haptic } from '../../hooks/useHaptics'
 import GoldButton from '../../components/common/GoldButton'
 import DarkCard from '../../components/common/DarkCard'
 import EmptyState from '../../components/common/EmptyState'
-import { useTeamsStore, MAX_TEAMS } from '../../stores/useTeamsStore'
+import { useTeamsQuery, useTeamMutations } from '../../hooks/useQueries'
+import { MAX_TEAMS } from '../../stores/useTeamsStore' // We'll eventually move MAX_TEAMS out too
 import TeamFormModal from './components/TeamFormModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import TeamLogo from '../../components/common/TeamLogo'
 import { useI18n } from '../../i18n/useI18n'
 
 export default function TeamsAdminPage() {
-  const teams = useTeamsStore((state) => state.teams)
-  const addTeam = useTeamsStore((state) => state.addTeam)
-  const updateTeam = useTeamsStore((state) => state.updateTeam)
-  const deleteTeam = useTeamsStore((state) => state.deleteTeam)
+  const { data: teams = [] } = useTeamsQuery()
+  const { createTeam, updateTeam, deleteTeam } = useTeamMutations()
   const { t, isAr } = useI18n()
 
   const [formOpen, setFormOpen] = useState(false)
@@ -38,9 +37,9 @@ export default function TeamsAdminPage() {
 
   const handleFormSubmit = async (data) => {
     if (editingTeam) {
-      await updateTeam(editingTeam.id, data)
+      await updateTeam.mutateAsync({ id: editingTeam.id, data })
     } else {
-      await addTeam(data)
+      await createTeam.mutateAsync(data)
     }
   }
 
@@ -167,7 +166,7 @@ export default function TeamsAdminPage() {
         isOpen={Boolean(deletingTeam)}
         onClose={() => setDeletingTeam(null)}
         onConfirm={async () => {
-          await deleteTeam(deletingTeam.id)
+          await deleteTeam.mutateAsync(deletingTeam.id)
         }}
         itemName={deletingTeam?.name}
       />
