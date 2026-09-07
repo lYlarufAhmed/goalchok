@@ -15,7 +15,7 @@ import { useI18n } from '../../i18n/useI18n'
 export default function TeamsAdminPage() {
   const { data: teams = [] } = useTeamsQuery()
   const { createTeam, updateTeam, deleteTeam } = useTeamMutations()
-  const { t, isAr } = useI18n()
+  const { t } = useI18n()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingTeam, setEditingTeam] = useState(null)

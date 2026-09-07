@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, Trash2, ChevronDown, Target, AlertCircle } from 'lucide-react'
+import { X, Plus, Trash2, Target, AlertCircle, ChevronDown } from 'lucide-react'
 import { useI18n } from '../../../i18n/useI18n'
 import { haptic } from '../../../hooks/useHaptics'
 import TeamLogo from '../../../components/common/TeamLogo'

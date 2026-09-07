@@ -1,13 +1,10 @@
 import {
-  collection,
-  doc,
   getDocs,
   setDoc,
   updateDoc,
   deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore'
-import { db } from '../config/firebase'
 import { generateUUID } from '../utils/uuid'
 import { getTenantCollection, getTenantDoc } from './tenantContext'
 

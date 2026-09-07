@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Trophy, CheckCircle, Lock, AlertCircle, RefreshCw, Plus, ArrowLeft } from 'lucide-react'
+import { Trophy, CheckCircle, Lock, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react'
 
 import { useKnockoutStore } from '../../stores/useKnockoutStore'
 import { useTeamsQuery, useMatchesQuery } from '../../hooks/useQueries'
@@ -42,8 +42,8 @@ export default function KnockoutAdminPage() {
   const qualifiedTeams = koStore.qualifiedTeams || []
   const knockoutMatches = koStore.knockoutMatches || []
 
-  const isReady = useMemo(() => isGroupStageComplete(allTeams, groupMatches), [allTeams, groupMatches])
-  const allStandings = useMemo(() => computeAllStandings(allTeams, groupMatches), [allTeams, groupMatches])
+  const isReady = isGroupStageComplete(allTeams, groupMatches)
+  const allStandings = computeAllStandings(allTeams, groupMatches)
 
   // Modals state
   const [changeTeamModal, setChangeTeamModal] = useState({ open: false, index: null, team: null })

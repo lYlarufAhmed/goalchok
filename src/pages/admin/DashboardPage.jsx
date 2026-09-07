@@ -3,16 +3,14 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import DarkCard from '../../components/common/DarkCard'
 import { useTeamsQuery, useMatchesQuery } from '../../hooks/useQueries'
-import { MAX_TEAMS, isDrawComplete } from '../../stores/useTeamsStore' // Keep helpers if needed for now
+import { MAX_TEAMS } from '../../stores/useTeamsStore' // Keep helpers if needed for now
 import { useI18n } from '../../i18n/useI18n'
 import { haptic } from '../../hooks/useHaptics'
 
 export default function DashboardPage() {
   const { data: teams = [] } = useTeamsQuery()
   const { data: matches = [] } = useMatchesQuery()
-  const drawLocked = false; // TODO: migrate drawLocked state from store to DB/Settings
-  const drawComplete = isDrawComplete(teams, drawLocked)
-  const { t, isAr } = useI18n()
+  const { t } = useI18n()
 
   const completedMatches = matches.filter((m) => m.status === 'completed')
   const scheduledMatches = matches.filter((m) => m.status === 'scheduled' || m.status === 'live')
