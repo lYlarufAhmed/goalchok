@@ -31,6 +31,7 @@ const navItemsAr = [
 
 export default function AdminLayout() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const loadingAuth = useAuthStore((state) => state.loading)
   const logout = useAuthStore((state) => state.logout)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const location = useLocation()
@@ -41,6 +42,10 @@ export default function AdminLayout() {
   const { t, isAr } = useI18n()
 
   const navItems = isAr ? navItemsAr : navItemsEn
+
+  if (loadingAuth) {
+    return <LoadingState message={isAr ? 'جاري التحقق من الصلاحيات...' : 'Checking authentication...'} />
+  }
 
   if (!isAuthenticated && !isLoggingOut) {
     return <Navigate to="/admin/login" replace />

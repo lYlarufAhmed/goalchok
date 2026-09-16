@@ -1,4 +1,14 @@
 {
+  "functions": {
+    "source": "functions",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "*.local"
+    ]
+  },
   "firestore": {
     "database": "(default)",
     "location": "me-central1",
@@ -27,16 +37,23 @@
 
   "emulators": {
     "auth": {
+      "host": "0.0.0.0",
       "port": 9099
     },
     "firestore": {
+      "host": "0.0.0.0",
       "port": 8085
     },
     "database": {
+      "host": "0.0.0.0",
       "port": 9000
+    },
+    "functions": {
+      "port": 5001
     },
     "ui": {
       "enabled": true,
+      "host": "0.0.0.0",
       "port": 4000
     },
     "singleProjectMode": true

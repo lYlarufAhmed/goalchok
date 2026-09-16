@@ -4,6 +4,7 @@ import * as knockoutService from '../services/knockoutService'
 import * as groupsService from '../services/groupsService'
 import * as settingsService from '../services/settingsService'
 import * as liveMatchService from '../services/liveMatchService'
+import { generateUUID } from '../utils/uuid'
 
 /**
  * In-Memory implementation of TournamentRepository for testing and offline environments.
@@ -25,7 +26,7 @@ export class InMemoryTournamentRepository {
   }
 
   async createTeam(data) {
-    const id = data.id || crypto.randomUUID()
+    const id = data.id || generateUUID()
     const team = {
       id,
       name: (data.name || '').trim(),
@@ -81,7 +82,7 @@ export class InMemoryTournamentRepository {
   }
 
   async createMatch(data) {
-    const id = data.id || crypto.randomUUID()
+    const id = data.id || generateUUID()
     const match = {
       id,
       group: data.group,
@@ -148,7 +149,7 @@ export class InMemoryTournamentRepository {
   }
 
   async createKnockoutMatch(data) {
-    const id = data.id || crypto.randomUUID()
+    const id = data.id || generateUUID()
     const match = {
       id,
       round: data.round,

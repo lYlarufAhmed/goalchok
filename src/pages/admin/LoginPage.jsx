@@ -8,8 +8,9 @@ import GoldButton from '../../components/common/GoldButton'
 import { useI18n } from '../../i18n/useI18n'
 
 export default function LoginPage() {
-  const [pin, setPin] = useState('')
-  const [error, setError] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const login = useAuthStore((state) => state.login)
   const navigate = useNavigate()
@@ -20,17 +21,16 @@ export default function LoginPage() {
     if (submitting) return
 
     setSubmitting(true)
-    setError(false)
+    setErrorMsg('')
 
-    await new Promise((r) => setTimeout(r, 300))
+    const result = await login(email, password)
 
-    if (login(pin)) {
+    if (result.success) {
       haptic.intense()
       navigate('/admin/dashboard')
     } else {
       haptic.heavy()
-      setError(true)
-      setPin('')
+      setErrorMsg(result.error || (isAr ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials'))
       setSubmitting(false)
     }
   }
@@ -58,21 +58,21 @@ export default function LoginPage() {
 
         <h1 className="text-2xl font-bold mb-2">{isAr ? 'لوحة التحكم' : 'Admin Panel'}</h1>
         <p className="text-sm text-text-secondary mb-8 text-center">
-          {isAr ? 'أدخل رمز الدخول السري للوصول إلى الإدارة' : 'Enter the secret PIN to access the admin panel'}
+          {isAr ? 'أدخل بريدك الإلكتروني وكلمة المرور للوصول إلى الإدارة' : 'Enter your email and password to access the admin panel'}
         </p>
 
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
           <div>
             <input
-              type="password"
-              value={pin}
+              type="email"
+              value={email}
               onChange={(e) => {
-                setPin(e.target.value)
-                if (error) setError(false)
+                setEmail(e.target.value)
+                if (errorMsg) setErrorMsg('')
               }}
-              placeholder="••••"
-              className={`w-full text-center tracking-[1em] text-2xl bg-bg-surface border rounded-xl py-4 focus:outline-none transition-colors ${
-                error
+              placeholder={isAr ? 'البريد الإلكتروني' : 'Email'}
+              className={`w-full text-center text-lg bg-bg-surface border rounded-xl py-4 mb-3 focus:outline-none transition-colors ${
+                errorMsg
                   ? 'border-danger/60 focus:border-danger'
                   : 'border-border focus:border-accent'
               }`}
@@ -80,10 +80,26 @@ export default function LoginPage() {
               autoFocus
               disabled={submitting}
             />
-            {error && (
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                if (errorMsg) setErrorMsg('')
+              }}
+              placeholder={isAr ? 'كلمة المرور' : 'Password'}
+              className={`w-full text-center text-lg bg-bg-surface border rounded-xl py-4 focus:outline-none transition-colors ${
+                errorMsg
+                  ? 'border-danger/60 focus:border-danger'
+                  : 'border-border focus:border-accent'
+              }`}
+              dir="ltr"
+              disabled={submitting}
+            />
+            {errorMsg && (
               <div className="flex items-center gap-1.5 text-danger text-xs mt-2 justify-center animate-pulse">
                 <ShieldAlert size={14} />
-                <span>{isAr ? 'رمز الدخول غير صحيح. حاول مرة أخرى' : 'Incorrect PIN. Try again'}</span>
+                <span>{errorMsg}</span>
               </div>
             )}
           </div>
