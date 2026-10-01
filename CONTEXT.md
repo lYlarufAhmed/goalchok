@@ -31,3 +31,11 @@ _Avoid_: MatchManager, StatusUpdater, ScoreHandler
 **TournamentRepository**:
 The unified data access repository providing an abstraction layer over tournament persistence (teams, group matches, knockout matches, groups, settings, live scores), decoupling domain operations from Firebase Firestore and RTDB.
 _Avoid_: DataStore, DBWrapper, ServiceHub
+
+**Organization (Tenant)**:
+The isolation boundary that owns all tournament data. Documents live under `organizations/{orgId}/tournaments/{tournamentId}/...`, and write access requires the caller's `orgId` custom claim to match the path org.
+_Avoid_: Workspace, Account, Team (already means a competing football team)
+
+**Admin Claim**:
+The `role: 'admin'` custom claim on a Firebase Auth user — the only claim that authorizes writes to Firestore and RTDB. It is set only by an existing admin (via the `assignOrgId` callable) or out-of-band for the first admin; sign-up grants org membership only.
+_Avoid_: isAdmin flag, superuser, root

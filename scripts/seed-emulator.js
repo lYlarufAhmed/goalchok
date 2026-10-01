@@ -1,19 +1,23 @@
-import { initializeApp } from 'firebase/app'
-import { getFirestore, connectFirestoreEmulator, doc, setDoc, writeBatch } from 'firebase/firestore'
-import { getDatabase, connectDatabaseEmulator } from 'firebase/database'
+import { initializeApp } from 'firebase-admin/app'
+import { getFirestore } from 'firebase-admin/firestore'
+import { getAuth } from 'firebase-admin/auth'
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBi80z2Z5QHu_3OeaJepUnpM_Ec-Ri1fEs",
-  projectId: "goalchok-7391",
-  databaseURL: "http://127.0.0.1:9000?ns=goalchok-7391-default-rtdb"
-}
+// Seeding runs with elevated privileges (Admin SDK bypasses security rules)
+// and provisions the local admin account used for the emulator dev loop.
+// Requires the auth + firestore emulators to be running (ports 9099 / 8085).
+process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099'
+process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8085'
 
-const app = initializeApp(firebaseConfig)
+const PROJECT_ID = 'goalchok-7391'
+
+// Local-only credentials for the emulator dev loop — never valid in production.
+const DEV_ADMIN = { email: 'admin@goalchok.local', password: 'goalchok-admin' }
+
+const app = initializeApp({ projectId: PROJECT_ID })
+
 const db = getFirestore(app)
-const rtdb = getDatabase(app)
-
-connectFirestoreEmulator(db, '127.0.0.1', 8085)
-connectDatabaseEmulator(rtdb, '127.0.0.1', 9000)
+const auth = getAuth(app)
+const TENANT_BASE = ['organizations', 'default-org', 'tournaments', 'default-tournament']
 
 const bangladeshTeams = [
   // Group A
@@ -205,37 +209,56 @@ const dummyMatches = [
   }
 ]
 
+async function seedDevAdmin() {
+  try {
+    const user = await auth.createUser(DEV_ADMIN)
+    await auth.setCustomUserClaims(user.uid, { orgId: 'default-org', role: 'admin' })
+    console.log(`Created dev admin ${DEV_ADMIN.email}`)
+  } catch (err) {
+    if (err.code === 'auth/email-already-exists') {
+      const user = await auth.getUserByEmail(DEV_ADMIN.email)
+      await auth.setCustomUserClaims(user.uid, { orgId: 'default-org', role: 'admin' })
+      console.log(`Dev admin ${DEV_ADMIN.email} already exists; claims refreshed`)
+    } else {
+      throw err
+    }
+  }
+}
+
 async function seed() {
   console.log('Seeding Bangladesh Football Club dummy data into Firestore Emulator (127.0.0.1:8085)...')
 
-  const batch = writeBatch(db)
+  await seedDevAdmin()
 
-  // 1. Seed Teams
+  const batch = db.batch()
+
+  // 1. Seed Teams (tenant path — read by the tenant-aware teams service)
   for (const team of bangladeshTeams) {
-    batch.set(doc(db, 'teams', team.id), team)
+    batch.set(db.doc([...TENANT_BASE, 'teams', team.id].join('/')), team)
   }
 
-  // 2. Seed Groups
-  batch.set(doc(db, 'groups', 'groups_doc'), {
+  // 2. Seed Groups (legacy top-level path — read by the groups service)
+  batch.set(db.doc('groups/groups_doc'), {
     A: ['team-bashundhara', 'team-abahani', 'team-mohammedan', 'team-ctg-abahani'],
     B: ['team-russel', 'team-jamal', 'team-police', 'team-rahmatganj'],
     C: [],
     locked: true
   })
 
-  // 3. Seed Matches
+  // 3. Seed Matches (tenant path — read by the tenant-aware matches service)
   for (const m of dummyMatches) {
-    batch.set(doc(db, 'matches', m.id), m)
+    batch.set(db.doc([...TENANT_BASE, 'matches', m.id].join('/')), m)
   }
 
-  // 4. Seed Settings
-  batch.set(doc(db, 'settings', 'tournament'), {
+  // 4. Seed Settings (legacy top-level path — read by the settings service)
+  batch.set(db.doc('settings/tournament'), {
     drawLocked: true,
     tournamentPhase: 'مرحلة المجموعات'
   })
 
   await batch.commit()
   console.log('Successfully seeded 8 Bangladesh Football Teams, Groups, and Matches into local Firestore Emulator!')
+  console.log(`Admin login for the local dev loop: ${DEV_ADMIN.email} / ${DEV_ADMIN.password}`)
   process.exit(0)
 }
 

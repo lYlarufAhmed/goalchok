@@ -1,13 +1,14 @@
 import { useMemo } from 'react'
 import { useAuthStore } from '../stores/useAuthStore'
 
-// TODO: In Ticket 3 (Auth & Routing), these will be derived from:
-// 1. React Router URL params (e.g., /org/:orgId/t/:tournamentId/standings)
-// 2. Firebase Custom Claims (request.auth.token.orgId)
+// Tenant resolution, in priority order:
+// 1. Firebase Custom Claims (request.auth.token.orgId)
+// 2. React Router URL params (e.g., /org/:orgId/t/:tournamentId/standings) — pending routing work
 //
-// For now, we return a hardcoded "default" tenant to allow the incremental
-// migration of Firebase services without breaking the UI, but we use the
-// custom claim if it exists.
+// The fallback to "default-org" only picks which path is read or written.
+// It grants no authorization: firestore.rules decide writes from the user's
+// verified custom claims, and deny anyone whose claims don't match the org
+// being written to.
 
 export function useTenantContext() {
   const claims = useAuthStore((state) => state.claims)
