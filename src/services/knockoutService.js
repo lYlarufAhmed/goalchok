@@ -6,10 +6,9 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
-  query,
-  where,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import { generateUUID } from '../utils/uuid'
 
 const COLLECTION = 'knockout_matches'
 
@@ -25,7 +24,7 @@ export async function fetchKnockoutMatches() {
  * Create a single knockout match in Firebase
  */
 export async function createKnockoutMatch(matchData) {
-  const id = matchData.id || crypto.randomUUID()
+  const id = matchData.id || generateUUID()
   const match = {
     id,
     round: matchData.round,

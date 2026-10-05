@@ -8,7 +8,7 @@ export default function LiveScoreModal({ isOpen, onClose, onSubmit, match, teamA
   const [scoreA, setScoreA] = useState(0)
   const [scoreB, setScoreB] = useState(0)
   const [errors, setErrors] = useState({})
-  const { t, isAr } = useI18n()
+  const { t } = useI18n()
 
   useEffect(() => {
     if (isOpen && match) {

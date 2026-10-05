@@ -1,9 +1,60 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // A caller holding the privileged role. The role claim can only be set by
+    // an existing admin (see the assignOrgId cloud function), never by sign-up.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.role == 'admin';
+    }
+
+    // An admin belonging to the org that owns the document path.
+    function isOrgAdmin(orgId) {
+      return request.auth != null
+        && request.auth.token.orgId == orgId
+        && request.auth.token.role == 'admin';
+    }
+
+    // Tenant-scoped tournament data: spectators read, the owning org's admins write.
+    match /organizations/{orgId}/tournaments/{tournamentId}/{document=**} {
+      allow read: if true;
+      allow write: if isOrgAdmin(orgId);
+    }
+
+    // Legacy top-level collections still served by active services
+    // (knockout matches, groups, settings). Writes are admin-only; reads stay
+    // public for the spectator UI.
+    match /matches/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /teams/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /knockout_matches/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /groups/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Everything else (user profiles, future collections) is denied until
+    // rules are added for it explicitly.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

@@ -1,6 +1,10 @@
 import { create } from 'zustand'
 import { generateQFPairings, getKnockoutWinner, generateKoId, isGroupStageComplete, getQualifiedTeams } from '../utils/knockoutUtils'
+import { TournamentEngine } from '../domain/tournamentEngine'
+import { MatchLifecycleService } from '../domain/matchLifecycleService'
 import { doc, setDoc, onSnapshot } from 'firebase/firestore'
+
+const lifecycleService = new MatchLifecycleService()
 import { db } from '../config/firebase'
 import * as knockoutService from '../services/knockoutService'
 import {
@@ -67,11 +71,15 @@ export const useKnockoutStore = create((set, get) => {
         (snapshot) => {
           if (snapshot.exists()) {
             const data = snapshot.data()
-            set({
+            const updates = {
               step: data.step ?? 3,
               qualifiedTeams: data.qualifiedTeams || [],
               champion: data.champion || null,
-            })
+            }
+            if (data.knockoutMatches) {
+              updates.knockoutMatches = data.knockoutMatches
+            }
+            set(updates)
           }
         },
         (err) => {
@@ -200,19 +208,13 @@ export const useKnockoutStore = create((set, get) => {
 
     setKOMatchLive: async (id) => {
       try {
-        const initialResult = {
-          scoreA: 0,
-          scoreB: 0,
-          penaltyWinner: null,
-          scorers: [],
-          yellowCards: [],
-          redCards: [],
-        }
-        await knockoutService.updateKnockoutMatch(id, { status: 'live', result: initialResult })
+        const match = get().knockoutMatches.find((m) => m.id === id)
+        const updatedMatch = lifecycleService.startMatch(match || { id, status: 'scheduled' })
+        await knockoutService.updateKnockoutMatch(id, { status: 'live', result: updatedMatch.result })
         await setLiveMatch(id, { scoreA: 0, scoreB: 0, status: 'live', events: [] })
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
-            m.id === id ? { ...m, status: 'live', result: initialResult } : m
+            m.id === id ? { ...m, ...updatedMatch } : m
           ),
         }))
       } catch (err) {
@@ -223,16 +225,15 @@ export const useKnockoutStore = create((set, get) => {
     updateKOLiveScore: async (id, { scoreA, scoreB }) => {
       try {
         const match = get().knockoutMatches.find((m) => m.id === id)
-        const updatedResult = {
-          ...(match?.result || {}),
-          scoreA: Number(scoreA) || 0,
-          scoreB: Number(scoreB) || 0,
-        }
-        await updateLiveScoreRtdb(id, updatedResult.scoreA, updatedResult.scoreB, [])
-        await knockoutService.updateKnockoutMatch(id, { status: 'live', result: updatedResult })
+        const updatedMatch = lifecycleService.updateLiveScore(
+          match || { id, status: 'live', result: { scoreA: 0, scoreB: 0 } },
+          { scoreA, scoreB }
+        )
+        await updateLiveScoreRtdb(id, updatedMatch.result.scoreA, updatedMatch.result.scoreB, [])
+        await knockoutService.updateKnockoutMatch(id, { status: 'live', result: updatedMatch.result })
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
-            m.id === id ? { ...m, status: 'live', result: updatedResult } : m
+            m.id === id ? { ...m, result: updatedMatch.result } : m
           ),
         }))
       } catch (err) {
@@ -242,10 +243,12 @@ export const useKnockoutStore = create((set, get) => {
 
     postponeKOMatch: async (id) => {
       try {
+        const match = get().knockoutMatches.find((m) => m.id === id)
+        const updatedMatch = lifecycleService.postponeMatch(match || { id, status: 'scheduled' })
         await knockoutService.updateKnockoutMatch(id, { status: 'postponed', result: null })
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
-            m.id === id ? { ...m, status: 'postponed', result: null } : m
+            m.id === id ? { ...m, ...updatedMatch } : m
           ),
         }))
       } catch (err) {
@@ -255,10 +258,12 @@ export const useKnockoutStore = create((set, get) => {
 
     restoreKOMatch: async (id) => {
       try {
+        const match = get().knockoutMatches.find((m) => m.id === id)
+        const updatedMatch = lifecycleService.resetMatch(match || { id, status: 'postponed' })
         await knockoutService.updateKnockoutMatch(id, { status: 'scheduled', result: null })
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
-            m.id === id ? { ...m, status: 'scheduled', result: null } : m
+            m.id === id ? { ...m, ...updatedMatch } : m
           ),
         }))
       } catch (err) {
@@ -268,14 +273,13 @@ export const useKnockoutStore = create((set, get) => {
 
     saveKOResult: async (id, result) => {
       try {
-        const updatedResult = {
-          scoreA: Number(result.scoreA) || 0,
-          scoreB: Number(result.scoreB) || 0,
-          penaltyWinner: result.penaltyWinner || null,
-          scorers: result.scorers || [],
-          yellowCards: result.yellowCards || [],
-          redCards: result.redCards || [],
-        }
+        const match = get().knockoutMatches.find((m) => m.id === id)
+        const updatedMatch = lifecycleService.completeMatch(
+          match || { id, status: 'scheduled' },
+          result,
+          { isKnockout: true }
+        )
+        const updatedResult = updatedMatch.result
 
         await knockoutService.updateKnockoutMatch(id, { status: 'completed', result: updatedResult })
         await clearLiveMatch(id).catch(() => {})
@@ -285,73 +289,17 @@ export const useKnockoutStore = create((set, get) => {
         )
         let champion = get().champion
 
-        const qfMatches = nextMatches.filter((m) => m.round === 'QF')
-        const sfMatches = nextMatches.filter((m) => m.round === 'SF')
+        const engine = new TournamentEngine([], [], nextMatches)
+        const { newMatches, champion: evaluatedChampion } = engine.evaluateKnockoutProgression()
 
-        if (
-          qfMatches.length === 4 &&
-          qfMatches.every((m) => m.status === 'completed') &&
-          sfMatches.length === 0
-        ) {
-          const qfWinners = qfMatches
-            .sort((a, b) => a.matchLabel.localeCompare(b.matchLabel))
-            .map((m) => getKnockoutWinner(m))
-
-          if (qfWinners.every(Boolean)) {
-            const newSf1 = {
-              id: generateKoId(),
-              round: 'SF',
-              matchLabel: 'SF 1',
-              teamA: qfWinners[0],
-              teamB: qfWinners[3],
-              date: '', time: '', venue: '',
-              status: 'scheduled', result: null,
-            }
-            const newSf2 = {
-              id: generateKoId(),
-              round: 'SF',
-              matchLabel: 'SF 2',
-              teamA: qfWinners[1],
-              teamB: qfWinners[2],
-              date: '', time: '', venue: '',
-              status: 'scheduled', result: null,
-            }
-            await knockoutService.createKnockoutMatch(newSf1)
-            await knockoutService.createKnockoutMatch(newSf2)
-            nextMatches = [...nextMatches, newSf1, newSf2]
-          }
+        for (const nm of newMatches) {
+          await knockoutService.createKnockoutMatch(nm)
         }
-
-        const updatedSFs = nextMatches.filter((m) => m.round === 'SF')
-        const finalMatches = nextMatches.filter((m) => m.round === 'F')
-
-        if (
-          updatedSFs.length === 2 &&
-          updatedSFs.every((m) => m.status === 'completed') &&
-          finalMatches.length === 0
-        ) {
-          const sfWinners = updatedSFs
-            .sort((a, b) => a.matchLabel.localeCompare(b.matchLabel))
-            .map((m) => getKnockoutWinner(m))
-
-          if (sfWinners.every(Boolean)) {
-            const newFinal = {
-              id: generateKoId(),
-              round: 'F',
-              matchLabel: 'النهائي',
-              teamA: sfWinners[0],
-              teamB: sfWinners[1],
-              date: '', time: '', venue: '',
-              status: 'scheduled', result: null,
-            }
-            await knockoutService.createKnockoutMatch(newFinal)
-            nextMatches = [...nextMatches, newFinal]
-          }
+        if (newMatches.length > 0) {
+          nextMatches = [...nextMatches, ...newMatches]
         }
-
-        const updatedFinals = nextMatches.filter((m) => m.round === 'F')
-        if (updatedFinals.length === 1 && updatedFinals[0].status === 'completed') {
-          champion = getKnockoutWinner(updatedFinals[0])
+        if (evaluatedChampion) {
+          champion = evaluatedChampion
           saveSettingsToFirestore({ step: get().step, qualifiedTeams: get().qualifiedTeams, champion })
         }
 

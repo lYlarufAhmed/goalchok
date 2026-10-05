@@ -17,8 +17,9 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { haptic } from '../../hooks/useHaptics'
-import { useTeamsStore, isDrawComplete } from '../../stores/useTeamsStore'
-import { useMatchesStore } from '../../stores/useMatchesStore'
+import { useTeamsQuery, useMatchesQuery, useMatchMutations } from '../../hooks/useQueries'
+import { isDrawComplete } from '../../stores/useTeamsStore' // Move later
+import { buildFullSchedule } from '../../utils/scheduleGenerator'
 import { useKnockoutStore } from '../../stores/useKnockoutStore'
 import EmptyState from '../../components/common/EmptyState'
 import MatchFormModal from './components/MatchFormModal'
@@ -257,18 +258,31 @@ function AdminMatchCard({
 }
 
 export default function MatchesAdminPage() {
-  const teams = useTeamsStore((state) => state.teams)
-  const drawLocked = useTeamsStore((state) => state.drawLocked)
-  const matches = useMatchesStore((state) => state.matches)
-  const addMatch = useMatchesStore((state) => state.addMatch)
-  const generateSchedule = useMatchesStore((state) => state.generateSchedule)
-  const updateMatchSchedule = useMatchesStore((state) => state.updateMatchSchedule)
-  const saveResult = useMatchesStore((state) => state.saveResult)
-  const setMatchLive = useMatchesStore((state) => state.setMatchLive)
-  const updateLiveScore = useMatchesStore((state) => state.updateLiveScore)
-  const deleteMatch = useMatchesStore((state) => state.deleteMatch)
-  const postponeMatch = useMatchesStore((state) => state.postponeMatch)
-  const restoreMatch = useMatchesStore((state) => state.restoreMatch)
+  const { data: teams = [] } = useTeamsQuery()
+  const { data: matches = [] } = useMatchesQuery()
+  const { 
+    createMatch, 
+    saveResult, 
+    deleteMatch,
+    updateMatchSchedule,
+    setMatchLive,
+    updateLiveScore,
+    postponeMatch,
+    restoreMatch,
+    generateSchedule: generateScheduleMutation
+  } = useMatchMutations()
+  
+  const drawLocked = false // TODO: Migrate from store to DB settings
+  
+  const generateSchedule = async (teamsList) => {
+    const schedule = buildFullSchedule(teamsList)
+    if (!schedule.length) {
+      alert('Draw required first — no teams in groups') // TODO: use toast
+      return
+    }
+    await generateScheduleMutation.mutateAsync(schedule)
+  } 
+  
   const { t, isAr } = useI18n()
   const koStore = useKnockoutStore()
 
@@ -449,14 +463,14 @@ export default function MatchesAdminPage() {
                       onEditResult={setResultMatch}
                       onEditDate={setDateMatch}
                       onStartLive={async (m) => {
-                        await setMatchLive(m.id)
+                        await setMatchLive.mutateAsync(m.id)
                       }}
                       onUpdateLive={setLiveMatch}
                       onPostpone={async (m) => {
-                        await postponeMatch(m.id)
+                        await postponeMatch.mutateAsync(m.id)
                       }}
                       onRestore={async (m) => {
-                        await restoreMatch(m.id)
+                        await restoreMatch.mutateAsync(m.id)
                       }}
                       onDelete={setDeletingMatch}
                       t={t}
@@ -474,7 +488,7 @@ export default function MatchesAdminPage() {
         isOpen={formOpen}
         onClose={() => setFormOpen(false)}
         onSubmitGroup={async (data) => {
-          await addMatch(data)
+          await createMatch.mutateAsync(data)
         }}
         onSubmitKnockout={(data) => {
           koStore.addKOMatch(data)
@@ -485,7 +499,7 @@ export default function MatchesAdminPage() {
         isOpen={Boolean(dateMatch)}
         onClose={() => setDateMatch(null)}
         onSubmit={async (data) => {
-          await updateMatchSchedule(dateMatch.id, data)
+          await updateMatchSchedule.mutateAsync({ id: dateMatch.id, data })
         }}
         match={dateMatch}
         teamA={dateMatch ? getTeam(dateMatch.teamA) : null}
@@ -496,7 +510,7 @@ export default function MatchesAdminPage() {
         isOpen={Boolean(resultMatch)}
         onClose={() => setResultMatch(null)}
         onSubmit={async (result) => {
-          await saveResult(resultMatch.id, result, false)
+          await saveResult.mutateAsync({ id: resultMatch.id, result })
         }}
         match={resultMatch}
         teamA={resultMatch ? getTeam(resultMatch.teamA) : null}
@@ -507,7 +521,7 @@ export default function MatchesAdminPage() {
         isOpen={Boolean(liveMatch)}
         onClose={() => setLiveMatch(null)}
         onSubmit={async ({ scoreA, scoreB, events }) => {
-          await updateLiveScore(liveMatch.id, { scoreA, scoreB, events })
+          await updateLiveScore.mutateAsync({ id: liveMatch.id, scoreA, scoreB, events })
         }}
         match={liveMatch}
         teamA={liveMatch ? getTeam(liveMatch.teamA) : null}
@@ -519,7 +533,7 @@ export default function MatchesAdminPage() {
         isOpen={Boolean(deletingMatch)}
         onClose={() => setDeletingMatch(null)}
         onConfirm={async () => {
-          await deleteMatch(deletingMatch.id)
+          await deleteMatch.mutateAsync(deletingMatch.id)
         }}
         title={t('matches.deleteMatchTitle')}
         message={t('matches.deleteMatchMsg')

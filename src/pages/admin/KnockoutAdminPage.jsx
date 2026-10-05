@@ -1,11 +1,10 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Trophy, CheckCircle, Lock, AlertCircle, RefreshCw, Plus, ArrowLeft } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { Trophy, CheckCircle, Lock, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react'
 
 import { useKnockoutStore } from '../../stores/useKnockoutStore'
-import { useTeamsStore } from '../../stores/useTeamsStore'
-import { useMatchesStore } from '../../stores/useMatchesStore'
+import { useTeamsQuery, useMatchesQuery } from '../../hooks/useQueries'
 import { isGroupStageComplete, getQualifiedTeams, computeAllStandings } from '../../utils/knockoutUtils'
 import { useI18n } from '../../i18n/useI18n'
 import { haptic } from '../../hooks/useHaptics'
@@ -30,24 +29,23 @@ export default function KnockoutAdminPage() {
   const navigate = useNavigate()
   
   const koStore = useKnockoutStore()
-  const teamsStore = useTeamsStore()
-  const matchesStore = useMatchesStore()
+  const { data: allTeams = [] } = useTeamsQuery()
+  const { data: groupMatches = [] } = useMatchesQuery()
 
   useEffect(() => {
     // Ensure the Firestore listener is active. App.jsx owns the lifecycle,
     // so we do NOT call cleanup() on unmount here — doing so would kill the
     // shared subscription and break the public-facing pages.
     koStore.listenToFirestore()
+    // Deliberately run once on mount; App.jsx owns the listener lifecycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const allTeams = teamsStore.teams || []
-  const groupMatches = matchesStore.matches || []
 
   const qualifiedTeams = koStore.qualifiedTeams || []
   const knockoutMatches = koStore.knockoutMatches || []
 
-  const isReady = useMemo(() => isGroupStageComplete(allTeams, groupMatches), [allTeams, groupMatches])
-  const allStandings = useMemo(() => computeAllStandings(allTeams, groupMatches), [allTeams, groupMatches])
+  const isReady = isGroupStageComplete(allTeams, groupMatches)
+  const allStandings = computeAllStandings(allTeams, groupMatches)
 
   // Modals state
   const [changeTeamModal, setChangeTeamModal] = useState({ open: false, index: null, team: null })

@@ -10,7 +10,6 @@ import {
   PauseCircle,
   PlayCircle,
   Trophy,
-  Users,
 } from 'lucide-react'
 import { haptic } from '../../../hooks/useHaptics'
 import TeamLogo from '../../../components/common/TeamLogo'

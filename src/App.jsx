@@ -21,6 +21,7 @@ import MatchesAdminPage from './pages/admin/MatchesAdminPage'
 import ScheduleEagleEyeAdminPage from './pages/admin/ScheduleEagleEyePage'
 import KnockoutAdminPage from './pages/admin/KnockoutAdminPage'
 import { useAppStore } from './stores/useAppStore'
+import { useAuthStore } from './stores/useAuthStore'
 import { useKnockoutStore } from './stores/useKnockoutStore'
 import { Toaster } from 'react-hot-toast'
 
@@ -28,9 +29,11 @@ function App() {
   const { theme, language } = useAppStore()
 
   useEffect(() => {
+    const unsubAuth = useAuthStore.getState().initialize()
     useKnockoutStore.getState().listenToFirestore()
     useAppStore.getState().listenToFirestore()
     return () => {
+      unsubAuth()
       useKnockoutStore.getState().cleanup()
       useAppStore.getState().cleanup()
     }

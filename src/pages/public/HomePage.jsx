@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import gsap from 'gsap'
 import { motion } from 'framer-motion'
-import { ChevronLeft, Settings, Sun, Moon, Trophy } from 'lucide-react'
+import { ChevronLeft, Settings, Trophy } from 'lucide-react'
 import { haptic } from '../../hooks/useHaptics'
 import StatCard from '../../components/common/StatCard'
 import MatchRow from '../../components/common/MatchRow'
@@ -24,12 +24,10 @@ import { useTranslation } from '../../hooks/useTranslation'
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { theme, toggleTheme } = useAppStore()
   const { t, lang } = useTranslation()
 
-  const { language, toggleLanguage } = useAppStore()
+  const { language } = useAppStore()
   const koMatches = useKnockoutStore((s) => s.knockoutMatches)
-  const koChampion = useKnockoutStore((s) => s.champion)
   const knockoutStep = useKnockoutStore((s) => s.step)
 
   // Only show bracket if knockout stage has started (step >= 3 and has matches)

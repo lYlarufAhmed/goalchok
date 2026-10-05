@@ -5,7 +5,6 @@ import { useAppStore } from '../../stores/useAppStore'
 import { useKnockoutStore } from '../../stores/useKnockoutStore'
 import { haptic } from '../../hooks/useHaptics'
 import TeamLogo from './TeamLogo'
-import DownloadButton from './DownloadButton'
 
 export default function TournamentBracketView({ teams = [], isAdmin = false }) {
   const lang = useAppStore((s) => s.language)
@@ -18,7 +17,7 @@ export default function TournamentBracketView({ teams = [], isAdmin = false }) {
   const champion = useKnockoutStore((s) => s.champion)
 
   const bracketRef = useRef(null)
-  const [capturing, setCapturing] = useState(false)
+  const [capturing] = useState(false)
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
 

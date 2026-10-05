@@ -31,9 +31,11 @@ test.describe('Reliability & Offline-First Tests', () => {
 
     // 5. Restore network connection
     await context.setOffline(false)
+    await page.waitForTimeout(500)
 
-    // 6. Reload should load successfully
-    await page.reload()
+    // 6. Fresh navigation should load successfully (reload after an aborted
+    // offline navigation can hit a detached frame in Chromium)
+    await page.goto('/')
     const titleLocator = page.getByText('GoalChok-গোলছক')
     await expect(titleLocator.first()).toBeVisible({ timeout: 15000 })
   })

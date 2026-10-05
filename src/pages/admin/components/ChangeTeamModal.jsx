@@ -14,7 +14,6 @@ export default function ChangeTeamModal({
   onClose,
   onSelect,
   currentTeamId,
-  currentSeed,
   currentSeedLabel,
   teams,
   allStandings, // { A: [...], B: [...], C: [...] }

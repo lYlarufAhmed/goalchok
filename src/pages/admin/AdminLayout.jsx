@@ -3,13 +3,11 @@ import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-d
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useAppStore } from '../../stores/useAppStore'
 import { Trophy, LogOut, LayoutDashboard, Users, Calendar, Shuffle, RotateCcw, Swords } from 'lucide-react'
-import AdminDataSync from '../../components/providers/AdminDataSync'
 import LoadingState from '../../components/common/LoadingState'
 import ErrorState from '../../components/common/ErrorState'
 import AdminErrorBanner from '../../components/common/AdminErrorBanner'
 import AdminBottomNav from '../../components/layout/AdminBottomNav'
-import { useTeamsStore } from '../../stores/useTeamsStore'
-import { useMatchesStore } from '../../stores/useMatchesStore'
+import { useTeamsQuery, useMatchesQuery } from '../../hooks/useQueries'
 import { useI18n } from '../../i18n/useI18n'
 import { haptic } from '../../hooks/useHaptics'
 
@@ -33,20 +31,21 @@ const navItemsAr = [
 
 export default function AdminLayout() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const loadingAuth = useAuthStore((state) => state.loading)
   const logout = useAuthStore((state) => state.logout)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const teamsLoading = useTeamsStore((s) => !s.initialized)
-  const matchesLoading = useMatchesStore((s) => !s.initialized)
-  const teamsFetchError = useTeamsStore((s) => s.fetchError)
-  const matchesFetchError = useMatchesStore((s) => s.fetchError)
-  const fetchTeams = useTeamsStore((s) => s.fetchAll)
-  const fetchMatches = useMatchesStore((s) => s.fetchAll)
+  const { isLoading: teamsLoading, isError: teamsFetchError, refetch: fetchTeams } = useTeamsQuery()
+  const { isLoading: matchesLoading, isError: matchesFetchError, refetch: fetchMatches } = useMatchesQuery()
   const initFailed = !teamsLoading && !matchesLoading && (teamsFetchError || matchesFetchError)
   const { t, isAr } = useI18n()
 
   const navItems = isAr ? navItemsAr : navItemsEn
+
+  if (loadingAuth) {
+    return <LoadingState message={isAr ? 'جاري التحقق من الصلاحيات...' : 'Checking authentication...'} />
+  }
 
   if (!isAuthenticated && !isLoggingOut) {
     return <Navigate to="/admin/login" replace />
@@ -71,9 +70,8 @@ export default function AdminLayout() {
   const loadingMsg = isAr ? 'جاري تحميل بيانات الإدارة...' : 'Loading admin data...'
 
   return (
-    <AdminDataSync>
-      <div className="h-screen h-[100dvh] w-full overflow-hidden flex flex-col bg-bg-primary transition-colors duration-300">
-        <header className="h-14 md:h-16 shrink-0 bg-bg-primary border-b border-border px-3 md:px-4 flex items-center justify-between z-50 gap-2">
+    <div className="h-screen h-[100dvh] w-full overflow-hidden flex flex-col bg-bg-primary transition-colors duration-300">
+      <header className="h-14 md:h-16 shrink-0 bg-bg-primary border-b border-border px-3 md:px-4 flex items-center justify-between z-50 gap-2">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <Link
               to="/"
@@ -159,7 +157,6 @@ export default function AdminLayout() {
               />
             ) : (
               <div className="max-w-4xl mx-auto min-h-full">
-
                 <AdminErrorBanner />
                 <Outlet />
               </div>
@@ -167,6 +164,5 @@ export default function AdminLayout() {
           </main>
         </div>
       </div>
-    </AdminDataSync>
   )
 }

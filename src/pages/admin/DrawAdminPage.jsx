@@ -3,11 +3,8 @@ import { Link } from 'react-router-dom'
 import gsap from 'gsap'
 import { Shuffle, Users, AlertCircle, RefreshCw } from 'lucide-react'
 import { haptic } from '../../hooks/useHaptics'
-import {
-  useTeamsStore,
-  MAX_TEAMS,
-  isDrawComplete,
-} from '../../stores/useTeamsStore'
+import { useTeamsQuery, useTeamMutations } from '../../hooks/useQueries'
+import { MAX_TEAMS, isDrawComplete } from '../../stores/useTeamsStore'
 import { useI18n } from '../../i18n/useI18n'
 import { resolveTeamColor } from '../../utils/teamColors'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
@@ -71,10 +68,9 @@ function GroupCard({ group, teamIds, teams, innerRef, hidden = false, itemLabel,
 }
 
 export default function DrawAdminPage() {
-  const teams = useTeamsStore((state) => state.teams)
-  const drawLocked = useTeamsStore((state) => state.drawLocked)
-  const assignGroups = useTeamsStore((state) => state.assignGroups)
-  const clearGroups = useTeamsStore((state) => state.clearGroups)
+  const { data: teams = [] } = useTeamsQuery()
+  const { assignGroups, clearGroups } = useTeamMutations()
+  const drawLocked = false // TODO: Migrate from store to DB settings
   const { t, isAr } = useI18n()
 
   const [isDrawing, setIsDrawing] = useState(false)
@@ -101,7 +97,7 @@ export default function DrawAdminPage() {
           // Fire async — gsap onComplete doesn't support async,
           // so use .then() to ensure isDrawing resets on error too
           Promise.resolve()
-            .then(() => assignGroups(groups))
+            .then(() => assignGroups.mutateAsync(groups))
             .then(() => {
               setPreviewGroups(null)
               setIsDrawing(false)
@@ -172,7 +168,7 @@ export default function DrawAdminPage() {
     // First clear existing groups, then re-draw
     try {
       setIsDrawing(true)
-      await clearGroups()
+      await clearGroups.mutateAsync(teams)
       // After clearing, the teams have no groups, so we can re-draw
       handleDraw()
     } catch (err) {

@@ -1,10 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager, 
-  connectFirestoreEmulator 
-} from 'firebase/firestore'
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { getDatabase, connectDatabaseEmulator } from 'firebase/database'
 
 const firebaseConfig = {
@@ -19,19 +14,22 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 
-import { getFirestore } from 'firebase/firestore'
+import { getAuth, connectAuthEmulator } from 'firebase/auth'
 
 // Disable offline persistence for now so you don't see cached emulator data
 export const db = getFirestore(app)
-
 export const rtdb = getDatabase(app)
+export const auth = getAuth(app)
 
 // Connect to emulators locally during development & testing
-// Disabled for production - set VITE_USE_EMULATORS=true in .env.local to enable for local dev
-const useEmulators = false
+const useEmulators = import.meta.env.VITE_USE_EMULATOR === 'true' || import.meta.env.MODE === 'emulator'
 if (useEmulators) {
-  connectFirestoreEmulator(db, '127.0.0.1', 8080)
-  connectDatabaseEmulator(rtdb, '127.0.0.1', 9000)
+  const host = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? window.location.hostname
+    : '127.0.0.1'
+  connectFirestoreEmulator(db, host, 8085)
+  connectDatabaseEmulator(rtdb, host, 9000)
+  connectAuthEmulator(auth, `http://${host}:9099`)
 }
 
 export default app

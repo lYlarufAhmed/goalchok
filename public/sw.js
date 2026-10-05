@@ -3,7 +3,7 @@
 
 const CACHE_NAME = 'goalchok-v1'
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   self.skipWaiting()
 })
 

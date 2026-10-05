@@ -1,6 +1,4 @@
 import {
-  collection,
-  doc,
   getDocs,
   setDoc,
   updateDoc,
@@ -8,16 +6,20 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import { MatchLifecycleService } from '../domain/matchLifecycleService'
+import { generateUUID } from '../utils/uuid'
+import { getTenantCollection, getTenantDoc } from './tenantContext'
 
-const COLLECTION = 'matches'
+const lifecycleService = new MatchLifecycleService()
 
-export async function fetchMatches() {
-  const snapshot = await getDocs(collection(db, COLLECTION))
+export async function fetchMatches(orgId, tournamentId) {
+  const colRef = getTenantCollection(orgId, tournamentId, 'matches')
+  const snapshot = await getDocs(colRef)
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))
 }
 
-export async function createMatch({ group, teamA, teamB, date, time, venue }) {
-  const id = crypto.randomUUID()
+export async function createMatch({ orgId, tournamentId, group, teamA, teamB, date, time, venue }) {
+  const id = generateUUID()
   const match = {
     id,
     group,
@@ -29,7 +31,8 @@ export async function createMatch({ group, teamA, teamB, date, time, venue }) {
     status: 'scheduled',
     result: null,
   }
-  await setDoc(doc(db, COLLECTION, id), match)
+  const docRef = getTenantDoc(orgId, tournamentId, 'matches', id)
+  await setDoc(docRef, match)
   return match
 }
 
@@ -47,18 +50,19 @@ function stripUndefined(value) {
   return cleaned
 }
 
-export async function updateMatchDoc(id, updates) {
-  await updateDoc(doc(db, COLLECTION, id), stripUndefined(updates))
+export async function updateMatchDoc(orgId, tournamentId, id, updates) {
+  const docRef = getTenantDoc(orgId, tournamentId, 'matches', id)
+  await updateDoc(docRef, stripUndefined(updates))
 }
 
-export async function bulkCreateMatches(matchesList) {
+export async function bulkCreateMatches(orgId, tournamentId, matchesList) {
   if (!matchesList.length) return []
 
   const batch = writeBatch(db)
   const created = []
 
   matchesList.forEach((data) => {
-    const id = crypto.randomUUID()
+    const id = generateUUID()
     const match = {
       id,
       group: data.group,
@@ -70,7 +74,8 @@ export async function bulkCreateMatches(matchesList) {
       status: 'scheduled',
       result: null,
     }
-    batch.set(doc(db, COLLECTION, id), match)
+    const docRef = getTenantDoc(orgId, tournamentId, 'matches', id)
+    batch.set(docRef, match)
     created.push(match)
   })
 
@@ -78,34 +83,25 @@ export async function bulkCreateMatches(matchesList) {
   return created
 }
 
-export async function deleteMatchDoc(id) {
-  await deleteDoc(doc(db, COLLECTION, id))
+export async function deleteMatchDoc(orgId, tournamentId, id) {
+  const docRef = getTenantDoc(orgId, tournamentId, 'matches', id)
+  await deleteDoc(docRef)
 }
 
-export async function saveMatchResult(id, result, status = 'completed') {
+export async function saveMatchResult(orgId, tournamentId, id, result, status = 'completed') {
+  const validatedResult = lifecycleService.validateResultPayload(result)
   const payload = stripUndefined({
     status,
-    result: {
-      scoreA: Number(result.scoreA) || 0,
-      scoreB: Number(result.scoreB) || 0,
-      scorers: (result.scorers || []).map((s) =>
-        stripUndefined({
-          player: s.player,
-          teamId: s.teamId,
-          minute: s.minute != null && s.minute !== '' ? Number(s.minute) : undefined,
-        })
-      ),
-      yellowCards: (result.yellowCards || []).map((c) => ({ player: c.player, teamId: c.teamId })),
-      redCards: (result.redCards || []).map((c) => ({ player: c.player, teamId: c.teamId })),
-    },
+    result: validatedResult,
   })
-  await updateDoc(doc(db, COLLECTION, id), payload)
+  const docRef = getTenantDoc(orgId, tournamentId, 'matches', id)
+  await updateDoc(docRef, payload)
 }
 
-export async function setMatchPostponed(id) {
-  await updateMatchDoc(id, { status: 'postponed', result: null })
+export async function setMatchPostponed(orgId, tournamentId, id) {
+  await updateMatchDoc(orgId, tournamentId, id, { status: 'postponed', result: null })
 }
 
-export async function restoreMatchScheduled(id) {
-  await updateMatchDoc(id, { status: 'scheduled', result: null })
+export async function restoreMatchScheduled(orgId, tournamentId, id) {
+  await updateMatchDoc(orgId, tournamentId, id, { status: 'scheduled', result: null })
 }
