@@ -257,7 +257,9 @@ export class TournamentEngine {
           teamB: qf4W,
           status: 'scheduled',
           result: null,
-          venue: 'ملاعب فيا',
+          date: '',
+          time: '',
+          venue: '',
         })
         newMatches.push({
           id: `ko-sf-2-${Date.now()}`,
@@ -268,7 +270,9 @@ export class TournamentEngine {
           teamB: qf3W,
           status: 'scheduled',
           result: null,
-          venue: 'ملاعب فيا',
+          date: '',
+          time: '',
+          venue: '',
         })
       }
     }
@@ -282,13 +286,15 @@ export class TournamentEngine {
         newMatches.push({
           id: `ko-f-1-${Date.now()}`,
           round: 'F',
-          matchLabel: 'Final',
+          matchLabel: 'النهائي',
           matchNumber: 1,
           teamA: sf1W,
           teamB: sf2W,
           status: 'scheduled',
           result: null,
-          venue: 'ملاعب فيا الرئيسية',
+          date: '',
+          time: '',
+          venue: '',
         })
       }
     }
