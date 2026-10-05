@@ -1,188 +1,426 @@
+import { getDoc, onSnapshot } from 'firebase/firestore'
 import * as teamsService from '../services/teamsService'
 import * as matchesService from '../services/matchesService'
 import * as knockoutService from '../services/knockoutService'
 import * as groupsService from '../services/groupsService'
 import * as settingsService from '../services/settingsService'
 import * as liveMatchService from '../services/liveMatchService'
+import { getTenantCollection, getTenantDoc } from '../services/tenantContext'
+import { MatchLifecycleService } from './matchLifecycleService'
 import { generateUUID } from '../utils/uuid'
 
+const lifecycle = new MatchLifecycleService()
+
 /**
- * In-Memory implementation of TournamentRepository for testing and offline environments.
+ * TournamentRepository — the single seam between the app and persistence.
+ *
+ * One interface hides tenant path building, result validation, batching,
+ * the Firestore + RTDB dual write for live matches, and multi-store write
+ * orchestration. Two adapters justify the seam:
+ *   - FirebaseTournamentRepository (production, Firebase backends)
+ *   - InMemoryTournamentRepository (tests)
+ *
+ * The tenant context ({ orgId, tournamentId }) is injected once at
+ * construction; callers never see org or tournament identity.
+ */
+
+function normalizeTeam(doc) {
+  const data = doc.data ? doc.data() : doc
+  return {
+    id: doc.id,
+    ...data,
+    players: Array.isArray(data.players) ? data.players : [],
+    logo: data.logo || null,
+    color: data.color || null,
+    group: data.group || null,
+    name: data.name || '',
+    manager: data.manager || '',
+  }
+}
+
+function normalizeMatch(doc) {
+  const data = doc.data ? doc.data() : doc
+  return { id: doc.id, ...data }
+}
+
+export class FirebaseTournamentRepository {
+  constructor({ orgId, tournamentId }) {
+    if (!orgId || !tournamentId) throw new Error('Tenant Context Missing')
+    this.orgId = orgId
+    this.tournamentId = tournamentId
+  }
+
+  // --- Teams ---
+
+  async fetchTeams() {
+    return teamsService.fetchTeams(this.orgId, this.tournamentId)
+  }
+
+  subscribeTeams(onData, onError) {
+    return onSnapshot(
+      getTenantCollection(this.orgId, this.tournamentId, 'teams'),
+      (snap) => onData(snap.docs.map(normalizeTeam)),
+      (err) => onError && onError(err)
+    )
+  }
+
+  async saveTeam(team) {
+    if (team.id) return teamsService.updateTeamDoc(this.orgId, this.tournamentId, team.id, team)
+    return teamsService.createTeam({ ...team, orgId: this.orgId, tournamentId: this.tournamentId })
+  }
+
+  async deleteTeam(id) {
+    return teamsService.deleteTeamDoc(this.orgId, this.tournamentId, id)
+  }
+
+  // --- Matches ---
+
+  async fetchMatches() {
+    return matchesService.fetchMatches(this.orgId, this.tournamentId)
+  }
+
+  subscribeMatches(onData, onError) {
+    return onSnapshot(
+      getTenantCollection(this.orgId, this.tournamentId, 'matches'),
+      (snap) => onData(snap.docs.map(normalizeMatch)),
+      (err) => onError && onError(err)
+    )
+  }
+
+  async saveMatch(match) {
+    if (match.id) return matchesService.updateMatchDoc(this.orgId, this.tournamentId, match.id, match)
+    return matchesService.createMatch({ ...match, orgId: this.orgId, tournamentId: this.tournamentId })
+  }
+
+  async deleteMatch(id) {
+    return matchesService.deleteMatchDoc(this.orgId, this.tournamentId, id)
+  }
+
+  async generateSchedule(matchesList) {
+    return matchesService.bulkCreateMatches(this.orgId, this.tournamentId, matchesList)
+  }
+
+  /**
+   * Validate the transition to `status` and the result payload, persist,
+   * and clear the RTDB live entry (the stream dies with the match).
+   */
+  async saveMatchResult(id, result, status = 'completed') {
+    const docRef = getTenantDoc(this.orgId, this.tournamentId, 'matches', id)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) throw new Error(`Match ${id} not found`)
+    const current = normalizeMatch(snap)
+
+    lifecycle.validateStateTransition(current.status, status)
+    await matchesService.saveMatchResult(this.orgId, this.tournamentId, id, result, status)
+    await liveMatchService.clearLiveMatch(id).catch(() => {})
+  }
+
+  /**
+   * Validated status transition (scheduled/live/completed/postponed).
+   * Going live also opens the RTDB live entry; every other transition
+   * closes it.
+   */
+  async setMatchStatus(id, status) {
+    const docRef = getTenantDoc(this.orgId, this.tournamentId, 'matches', id)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) throw new Error(`Match ${id} not found`)
+    const current = normalizeMatch(snap)
+
+    let updated
+    if (status === 'live') {
+      updated = lifecycle.startMatch(current)
+      await matchesService.updateMatchDoc(this.orgId, this.tournamentId, id, {
+        status: 'live',
+        result: updated.result,
+      })
+      await liveMatchService.setLiveMatch(id, { scoreA: 0, scoreB: 0, status: 'live', events: [] })
+      return updated
+    }
+
+    if (status === 'postponed') updated = lifecycle.postponeMatch(current)
+    else if (status === 'scheduled') updated = lifecycle.resetMatch(current)
+    else if (status === 'completed') updated = lifecycle.completeMatch(current, current.result || {})
+    else throw new Error(`Unknown status: ${status}`)
+
+    await matchesService.updateMatchDoc(this.orgId, this.tournamentId, id, {
+      status: updated.status,
+      result: updated.result,
+    })
+    await liveMatchService.clearLiveMatch(id).catch(() => {})
+    return updated
+  }
+
+  /**
+   * Live score update: validated against the lifecycle, then dual-written
+   * to the Firestore match document and the RTDB liveMatches entry so
+   * spectator streams and the tournament document never disagree.
+   */
+  async updateLiveScore(id, { scoreA, scoreB, events = [] }) {
+    const docRef = getTenantDoc(this.orgId, this.tournamentId, 'matches', id)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) throw new Error(`Match ${id} not found`)
+    const current = normalizeMatch(snap)
+
+    const updated = lifecycle.updateLiveScore(current, { scoreA, scoreB })
+    const liveResult = { ...updated.result, events }
+
+    await liveMatchService.updateLiveScore(id, liveResult.scoreA, liveResult.scoreB, events)
+    await matchesService.updateMatchDoc(this.orgId, this.tournamentId, id, {
+      status: 'live',
+      result: liveResult,
+    })
+    return { ...current, status: 'live', result: liveResult }
+  }
+
+  // --- Knockout ---
+
+  async fetchKnockoutMatches() {
+    return knockoutService.fetchKnockoutMatches()
+  }
+
+  async createKnockoutMatch(match) {
+    return knockoutService.createKnockoutMatch(match)
+  }
+
+  async updateKnockoutMatch(id, updates) {
+    return knockoutService.updateKnockoutMatch(id, updates)
+  }
+
+  async deleteKnockoutMatch(id) {
+    return knockoutService.deleteKnockoutMatch(id)
+  }
+
+  async clearKnockoutMatches() {
+    return knockoutService.clearKnockoutMatches()
+  }
+
+  // --- Groups & Settings ---
+
+  async fetchGroups() {
+    return groupsService.fetchGroups()
+  }
+
+  async saveGroups(groups) {
+    return groupsService.saveGroups(groups)
+  }
+
+  async fetchSettings() {
+    return settingsService.fetchSettings()
+  }
+
+  async saveSettings(updates) {
+    return settingsService.updateSettings(updates)
+  }
+
+  // --- Orchestration ---
+
+  /**
+   * Draw assignment: persist the groups document, stamp each team's group,
+   * and lock the draw — one verb instead of three coordinated writes
+   * leaking into a hook.
+   */
+  async assignGroups(groups) {
+    await groupsService.saveGroups(groups)
+
+    const groupMap = {}
+    Object.entries(groups).forEach(([group, teamIds]) => {
+      if (group === 'locked') return
+      teamIds.forEach((teamId) => {
+        groupMap[teamId] = group
+      })
+    })
+    await teamsService.updateTeamGroups(this.orgId, this.tournamentId, groupMap)
+
+    await settingsService.updateSettings({ drawLocked: true })
+  }
+
+  /**
+   * Inverse of assignGroups: clear the groups document, null every team's
+   * group, and unlock the draw.
+   */
+  async clearGroups(teams) {
+    await groupsService.clearGroupsDoc()
+
+    const teamIds = teams.map((t) => t.id)
+    await teamsService.clearAllTeamGroups(this.orgId, this.tournamentId, teamIds)
+
+    await settingsService.updateSettings({ drawLocked: false })
+  }
+}
+
+/**
+ * In-Memory adapter — same interface, plain Maps + listener sets.
+ * Documents are emulated as { id, data() } so the normalizers handle
+ * both Firestore snapshot docs and plain objects.
  */
 export class InMemoryTournamentRepository {
-  constructor() {
+  constructor({ orgId = 'default-org', tournamentId = 'default-tournament' } = {}) {
+    this.orgId = orgId
+    this.tournamentId = tournamentId
     this.teams = new Map()
     this.matches = new Map()
     this.knockoutMatches = new Map()
     this.groups = { A: [], B: [], C: [], locked: false }
-    this.settings = { drawLocked: false, tournamentPhase: 'مرحلة المجموعات', theme: 'dark', language: 'ar' }
-    this.knockoutSettings = { step: 1, qualifiedTeams: [], champion: null }
+    this.settings = { drawLocked: false, tournamentPhase: 'مرحلة المجموعات' }
     this.liveMatches = new Map()
+    this._teamListeners = new Set()
+    this._matchListeners = new Set()
+  }
+
+  _emit(listeners, docs) {
+    listeners.forEach((cb) => cb({ docs: docs.map((d) => ({ id: d.id, data: () => d })) }))
+  }
+
+  _notifyTeams() {
+    this._emit(this._teamListeners, Array.from(this.teams.values()))
+  }
+
+  _notifyMatches() {
+    this._emit(this._matchListeners, Array.from(this.matches.values()))
   }
 
   // --- Teams ---
-  async getTeams() {
-    return Array.from(this.teams.values())
+
+  async fetchTeams() {
+    return Array.from(this.teams.values()).map((t) => normalizeTeam({ id: t.id, data: () => t }))
   }
 
-  async createTeam(data) {
-    const id = data.id || generateUUID()
-    const team = {
-      id,
-      name: (data.name || '').trim(),
-      manager: (data.manager || '').trim(),
-      players: data.players || [],
-      logo: data.logo || null,
-      color: data.color || null,
-      group: data.group || null,
-      createdAt: new Date().toISOString(),
-    }
-    this.teams.set(id, team)
-    return team
+  subscribeTeams(onData) {
+    this._teamListeners.add(onData)
+    // Firestore fires immediately on subscribe; mirror that.
+    setTimeout(() => this._notifyTeams(), 0)
+    return () => this._teamListeners.delete(onData)
   }
 
-  async updateTeam(id, updates) {
-    const existing = this.teams.get(id)
-    if (existing) {
-      const updated = {
-        ...existing,
-        ...updates,
-        name: updates.name !== undefined ? (updates.name || '').trim() : existing.name,
-        manager: updates.manager !== undefined ? (updates.manager || '').trim() : existing.manager,
-      }
-      this.teams.set(id, updated)
+  async saveTeam(team) {
+    if (team.id) {
+      this.teams.set(team.id, { ...this.teams.get(team.id), ...team })
+      this._notifyTeams()
+      return { id: team.id }
     }
+    const id = generateUUID()
+    this.teams.set(id, { ...team, id })
+    this._notifyTeams()
+    return { id }
   }
 
   async deleteTeam(id) {
     this.teams.delete(id)
+    this._notifyTeams()
   }
 
-  async updateTeamGroups(groupMap) {
-    Object.entries(groupMap).forEach(([teamId, group]) => {
-      const team = this.teams.get(teamId)
-      if (team) {
-        this.teams.set(teamId, { ...team, group })
-      }
-    })
+  // --- Matches ---
+
+  async fetchMatches() {
+    return Array.from(this.matches.values()).map((m) => normalizeMatch({ id: m.id, data: () => m }))
   }
 
-  async clearAllTeamGroups(teamIds) {
-    teamIds.forEach((id) => {
-      const team = this.teams.get(id)
-      if (team) {
-        this.teams.set(id, { ...team, group: null })
-      }
-    })
+  subscribeMatches(onData) {
+    this._matchListeners.add(onData)
+    setTimeout(() => this._notifyMatches(), 0)
+    return () => this._matchListeners.delete(onData)
   }
 
-  // --- Group Matches ---
-  async getMatches() {
-    return Array.from(this.matches.values())
-  }
-
-  async createMatch(data) {
-    const id = data.id || generateUUID()
-    const match = {
-      id,
-      group: data.group,
-      teamA: data.teamA,
-      teamB: data.teamB,
-      date: data.date || '',
-      time: data.time || '',
-      venue: (data.venue || '').trim(),
-      status: 'scheduled',
-      result: null,
+  async saveMatch(match) {
+    if (match.id) {
+      const merged = { ...this.matches.get(match.id), ...match }
+      this.matches.set(match.id, merged)
+      this._notifyMatches()
+      return { id: match.id }
     }
-    this.matches.set(id, match)
-    return match
-  }
-
-  async updateMatch(id, updates) {
-    const existing = this.matches.get(id)
-    if (existing) {
-      this.matches.set(id, { ...existing, ...updates })
-    }
-  }
-
-  async bulkCreateMatches(matchesList) {
-    const created = []
-    for (const data of matchesList) {
-      const match = await this.createMatch(data)
-      created.push(match)
-    }
-    return created
+    const id = generateUUID()
+    this.matches.set(id, { status: 'scheduled', result: null, ...match, id })
+    this._notifyMatches()
+    return { id }
   }
 
   async deleteMatch(id) {
     this.matches.delete(id)
+    this._notifyMatches()
+  }
+
+  async generateSchedule(matchesList) {
+    const created = []
+    for (const data of matchesList) {
+      const id = generateUUID()
+      const match = { status: 'scheduled', result: null, ...data, id }
+      this.matches.set(id, match)
+      created.push(match)
+    }
+    this._notifyMatches()
+    return created
   }
 
   async saveMatchResult(id, result, status = 'completed') {
-    const existing = this.matches.get(id)
-    if (existing) {
-      this.matches.set(id, {
-        ...existing,
-        status,
-        result: {
-          scoreA: Number(result.scoreA) || 0,
-          scoreB: Number(result.scoreB) || 0,
-          scorers: result.scorers || [],
-          yellowCards: result.yellowCards || [],
-          redCards: result.redCards || [],
-        },
-      })
+    const current = this.matches.get(id)
+    if (!current) throw new Error(`Match ${id} not found`)
+    lifecycle.validateStateTransition(current.status, status)
+    const validated = lifecycle.completeMatch(current, result)
+    this.matches.set(id, { ...current, status: validated.status, result: validated.result })
+    this.liveMatches.delete(id)
+    this._notifyMatches()
+  }
+
+  async setMatchStatus(id, status) {
+    const current = this.matches.get(id)
+    if (!current) throw new Error(`Match ${id} not found`)
+
+    if (status === 'live') {
+      const updated = lifecycle.startMatch(current)
+      this.matches.set(id, { ...current, status: 'live', result: updated.result })
+      this.liveMatches.set(id, { scoreA: 0, scoreB: 0, status: 'live', events: [] })
+      this._notifyMatches()
+      return updated
     }
+
+    let updated
+    if (status === 'postponed') updated = lifecycle.postponeMatch(current)
+    else if (status === 'scheduled') updated = lifecycle.resetMatch(current)
+    else if (status === 'completed') updated = lifecycle.completeMatch(current, current.result || {})
+    else throw new Error(`Unknown status: ${status}`)
+
+    this.matches.set(id, { ...current, status: updated.status, result: updated.result })
+    this.liveMatches.delete(id)
+    this._notifyMatches()
+    return updated
   }
 
-  async setMatchPostponed(id) {
-    await this.updateMatch(id, { status: 'postponed', result: null })
+  async updateLiveScore(id, { scoreA, scoreB, events = [] }) {
+    const current = this.matches.get(id)
+    if (!current) throw new Error(`Match ${id} not found`)
+    const updated = lifecycle.updateLiveScore(current, { scoreA, scoreB })
+    const liveResult = { ...updated.result, events }
+    this.matches.set(id, { ...current, status: 'live', result: liveResult })
+    this.liveMatches.set(id, {
+      scoreA: liveResult.scoreA,
+      scoreB: liveResult.scoreB,
+      status: 'live',
+      events,
+    })
+    this._notifyMatches()
+    return { ...current, status: 'live', result: liveResult }
   }
 
-  async restoreMatchScheduled(id) {
-    await this.updateMatch(id, { status: 'scheduled', result: null })
-  }
+  // --- Knockout ---
 
-  // --- Knockout Matches ---
-  async getKnockoutMatches() {
+  async fetchKnockoutMatches() {
     return Array.from(this.knockoutMatches.values())
   }
 
-  async createKnockoutMatch(data) {
-    const id = data.id || generateUUID()
-    const match = {
-      id,
-      round: data.round,
-      matchLabel: data.matchLabel,
-      teamA: data.teamA,
-      teamB: data.teamB,
-      date: data.date || '',
-      time: data.time || '',
-      venue: data.venue || '',
-      status: data.status || 'scheduled',
-      result: data.result || null,
-    }
-    this.knockoutMatches.set(id, match)
-    return match
+  async createKnockoutMatch(match) {
+    const id = match.id || generateUUID()
+    this.knockoutMatches.set(id, { ...match, id })
+    return { id }
   }
 
   async updateKnockoutMatch(id, updates) {
     const existing = this.knockoutMatches.get(id)
-    if (existing) {
-      this.knockoutMatches.set(id, { ...existing, ...updates })
-    }
+    if (!existing) throw new Error(`Knockout match ${id} not found`)
+    this.knockoutMatches.set(id, { ...existing, ...updates })
   }
 
   async deleteKnockoutMatch(id) {
     this.knockoutMatches.delete(id)
-  }
-
-  async syncKnockoutMatches(matchesList) {
-    this.knockoutMatches.clear()
-    for (const m of matchesList) {
-      await this.createKnockoutMatch(m)
-    }
-    return matchesList
   }
 
   async clearKnockoutMatches() {
@@ -190,171 +428,59 @@ export class InMemoryTournamentRepository {
   }
 
   // --- Groups & Settings ---
-  async getGroups() {
-    return this.groups
+
+  async fetchGroups() {
+    return { ...this.groups }
   }
 
   async saveGroups(groups) {
-    this.groups = {
-      A: groups.A || [],
-      B: groups.B || [],
-      C: groups.C || [],
-      locked: true,
-    }
+    this.groups = { ...this.groups, ...groups }
   }
 
-  async clearGroups() {
-    this.groups = { A: [], B: [], C: [], locked: false }
+  async fetchSettings() {
+    return { ...this.settings }
   }
 
-  async getSettings() {
-    return this.settings
-  }
-
-  async updateSettings(updates) {
+  async saveSettings(updates) {
     this.settings = { ...this.settings, ...updates }
   }
 
-  async saveKnockoutSettings(settings) {
-    this.knockoutSettings = { ...this.knockoutSettings, ...settings }
-  }
+  // --- Orchestration ---
 
-  // --- Live Match ---
-  async getLiveMatch(matchId) {
-    return this.liveMatches.get(matchId) || null
-  }
+  async assignGroups(groups) {
+    await this.saveGroups(groups)
 
-  async setLiveMatch(matchId, data) {
-    this.liveMatches.set(matchId, {
-      scoreA: data.scoreA ?? 0,
-      scoreB: data.scoreB ?? 0,
-      status: data.status ?? 'live',
-      events: data.events ?? [],
+    Object.entries(groups).forEach(([group, teamIds]) => {
+      if (group === 'locked') return
+      teamIds.forEach((teamId) => {
+        const team = this.teams.get(teamId)
+        if (team) this.teams.set(teamId, { ...team, group })
+      })
     })
+    this._notifyTeams()
+
+    await this.saveSettings({ drawLocked: true })
   }
 
-  async updateLiveScore(matchId, scoreA, scoreB, events = []) {
-    const existing = this.liveMatches.get(matchId) || {}
-    this.liveMatches.set(matchId, {
-      ...existing,
-      scoreA,
-      scoreB,
-      status: 'live',
-      events,
+  async clearGroups(teams) {
+    this.groups = { A: [], B: [], C: [], locked: false }
+    teams.forEach((t) => {
+      const team = this.teams.get(t.id)
+      if (team) this.teams.set(t.id, { ...team, group: null })
     })
-  }
-
-  async clearLiveMatch(matchId) {
-    this.liveMatches.delete(matchId)
-  }
-
-  subscribeLiveMatch(matchId, callback) {
-    callback(this.getLiveMatch(matchId))
-    return () => {}
+    this._notifyTeams()
+    await this.saveSettings({ drawLocked: false })
   }
 }
 
 /**
- * Firebase-backed implementation of TournamentRepository.
+ * Factory — the composition point for tenant-injected repositories.
+ * App code resolves the tenant from the auth store; tests construct
+ * InMemoryTournamentRepository directly.
  */
-export class FirebaseTournamentRepository {
-  // Teams
-  getTeams() {
-    return teamsService.fetchTeams()
+export function createTournamentRepository({ orgId, tournamentId, adapter = 'firebase' } = {}) {
+  if (adapter === 'inmemory') {
+    return new InMemoryTournamentRepository({ orgId, tournamentId })
   }
-  createTeam(data) {
-    return teamsService.createTeam(data)
-  }
-  updateTeam(id, updates) {
-    return teamsService.updateTeamDoc(id, updates)
-  }
-  deleteTeam(id) {
-    return teamsService.deleteTeamDoc(id)
-  }
-  updateTeamGroups(groupMap) {
-    return teamsService.updateTeamGroups(groupMap)
-  }
-  clearAllTeamGroups(teamIds) {
-    return teamsService.clearAllTeamGroups(teamIds)
-  }
-
-  // Group Matches
-  getMatches() {
-    return matchesService.fetchMatches()
-  }
-  createMatch(data) {
-    return matchesService.createMatch(data)
-  }
-  updateMatch(id, updates) {
-    return matchesService.updateMatchDoc(id, updates)
-  }
-  bulkCreateMatches(matchesList) {
-    return matchesService.bulkCreateMatches(matchesList)
-  }
-  deleteMatch(id) {
-    return matchesService.deleteMatchDoc(id)
-  }
-  saveMatchResult(id, result, status) {
-    return matchesService.saveMatchResult(id, result, status)
-  }
-  setMatchPostponed(id) {
-    return matchesService.setMatchPostponed(id)
-  }
-  restoreMatchScheduled(id) {
-    return matchesService.restoreMatchScheduled(id)
-  }
-
-  // Knockout Matches
-  getKnockoutMatches() {
-    return knockoutService.fetchKnockoutMatches()
-  }
-  createKnockoutMatch(data) {
-    return knockoutService.createKnockoutMatch(data)
-  }
-  updateKnockoutMatch(id, updates) {
-    return knockoutService.updateKnockoutMatch(id, updates)
-  }
-  deleteKnockoutMatch(id) {
-    return knockoutService.deleteKnockoutMatch(id)
-  }
-  syncKnockoutMatches(matchesList) {
-    return knockoutService.syncKnockoutMatches(matchesList)
-  }
-  clearKnockoutMatches() {
-    return knockoutService.clearKnockoutMatches()
-  }
-
-  // Groups & Settings
-  getGroups() {
-    return groupsService.fetchGroups()
-  }
-  saveGroups(groups) {
-    return groupsService.saveGroups(groups)
-  }
-  clearGroups() {
-    return groupsService.clearGroupsDoc()
-  }
-  getSettings() {
-    return settingsService.fetchSettings()
-  }
-  updateSettings(updates) {
-    return settingsService.updateSettings(updates)
-  }
-
-  // Live Matches
-  setLiveMatch(matchId, data) {
-    return liveMatchService.setLiveMatch(matchId, data)
-  }
-  updateLiveScore(matchId, scoreA, scoreB, events) {
-    return liveMatchService.updateLiveScore(matchId, scoreA, scoreB, events)
-  }
-  clearLiveMatch(matchId) {
-    return liveMatchService.clearLiveMatch(matchId)
-  }
-  subscribeLiveMatch(matchId, callback) {
-    return liveMatchService.subscribeLiveMatch(matchId, callback)
-  }
+  return new FirebaseTournamentRepository({ orgId, tournamentId })
 }
-
-// Default export uses FirebaseTournamentRepository
-export const tournamentRepository = new FirebaseTournamentRepository()

@@ -2,10 +2,7 @@ import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useKnockoutStore } from '../stores/useKnockoutStore'
 import { mergeKnockoutMatches } from '../utils/matchMerge'
-import * as teamsService from '../services/teamsService'
-import * as matchesService from '../services/matchesService'
-import * as groupsService from '../services/groupsService'
-import * as settingsService from '../services/settingsService'
+import { useTournamentRepository } from './useTournamentRepository'
 import { useTenantContext } from './useTenantContext'
 
 export const queryKeys = {
@@ -17,9 +14,10 @@ export const queryKeys = {
 
 export function useTeamsQuery() {
   const { orgId, tournamentId } = useTenantContext()
+  const repository = useTournamentRepository()
   return useQuery({
     queryKey: queryKeys.teams(orgId, tournamentId),
-    queryFn: () => teamsService.fetchTeams(orgId, tournamentId),
+    queryFn: () => repository.fetchTeams(),
     staleTime: 5_000,
     refetchInterval: 8_000,
     refetchOnWindowFocus: true,
@@ -28,18 +26,20 @@ export function useTeamsQuery() {
 
 export function useMatchesQuery() {
   const { orgId, tournamentId } = useTenantContext()
+  const repository = useTournamentRepository()
   const koMatches = useKnockoutStore((s) => s.knockoutMatches)
   const query = useQuery({
     queryKey: queryKeys.matches(orgId, tournamentId),
-    queryFn: () => matchesService.fetchMatches(orgId, tournamentId),
+    queryFn: () => repository.fetchMatches(),
     staleTime: 5_000,
     refetchInterval: 8_000,
     refetchOnWindowFocus: true,
   })
 
-  const mergedData = useMemo(() => {
-    return query.data ? mergeKnockoutMatches(query.data, koMatches) : query.data
-  }, [query.data, koMatches])
+  const mergedData = useMemo(
+    () => (query.data ? mergeKnockoutMatches(query.data, koMatches) : query.data),
+    [query.data, koMatches]
+  )
 
   return {
     ...query,
@@ -49,20 +49,20 @@ export function useMatchesQuery() {
 
 export function useGroupsQuery() {
   const { orgId, tournamentId } = useTenantContext()
+  const repository = useTournamentRepository()
   return useQuery({
     queryKey: queryKeys.groups(orgId, tournamentId),
-    // TODO: update groupsService
-    queryFn: groupsService.fetchGroups,
+    queryFn: () => repository.fetchGroups(),
     staleTime: 60_000,
   })
 }
 
 export function useSettingsQuery() {
   const { orgId, tournamentId } = useTenantContext()
+  const repository = useTournamentRepository()
   return useQuery({
     queryKey: queryKeys.settings(orgId, tournamentId),
-    // TODO: update settingsService
-    queryFn: settingsService.fetchSettings,
+    queryFn: () => repository.fetchSettings(),
     staleTime: 60_000,
   })
 }
@@ -80,50 +80,26 @@ export function useInvalidateAll() {
 
 export function useTeamMutations() {
   const invalidate = useInvalidateAll()
-  const { orgId, tournamentId } = useTenantContext()
+  const repository = useTournamentRepository()
   const createTeam = useMutation({
-    mutationFn: (data) => teamsService.createTeam({ ...data, orgId, tournamentId }),
+    mutationFn: (data) => repository.saveTeam(data),
     onSuccess: invalidate,
   })
   const updateTeam = useMutation({
-    mutationFn: ({ id, data }) => teamsService.updateTeamDoc(orgId, tournamentId, id, data),
+    mutationFn: ({ id, data }) => repository.saveTeam({ id, ...data }),
     onSuccess: invalidate,
   })
   const deleteTeam = useMutation({
-    mutationFn: (id) => teamsService.deleteTeamDoc(orgId, tournamentId, id),
+    mutationFn: (id) => repository.deleteTeam(id),
     onSuccess: invalidate,
   })
+  // The multi-store write order lives inside the repository now.
   const assignGroups = useMutation({
-    mutationFn: async (groups) => {
-      // TODO: migrate groupsService to multi-tenant
-      await groupsService.saveGroups(groups)
-      
-      const groupMap = {}
-      Object.entries(groups).forEach(([group, teamIds]) => {
-        if (group === 'locked') return
-        teamIds.forEach((teamId) => {
-          groupMap[teamId] = group
-        })
-      })
-      await teamsService.updateTeamGroups(orgId, tournamentId, groupMap)
-      
-      // TODO: migrate settingsService to multi-tenant
-      await settingsService.updateSettings({ drawLocked: true })
-    },
+    mutationFn: (groups) => repository.assignGroups(groups),
     onSuccess: invalidate,
   })
-
   const clearGroups = useMutation({
-    mutationFn: async (teams) => {
-      // TODO: migrate groupsService to multi-tenant
-      await groupsService.clearGroupsDoc()
-      
-      const teamIds = teams.map((t) => t.id)
-      await teamsService.clearAllTeamGroups(orgId, tournamentId, teamIds)
-      
-      // TODO: migrate settingsService to multi-tenant
-      await settingsService.updateSettings({ drawLocked: false })
-    },
+    mutationFn: (teams) => repository.clearGroups(teams),
     onSuccess: invalidate,
   })
 
@@ -132,54 +108,54 @@ export function useTeamMutations() {
 
 export function useMatchMutations() {
   const invalidate = useInvalidateAll()
-  const { orgId, tournamentId } = useTenantContext()
+  const repository = useTournamentRepository()
   const createMatch = useMutation({
-    mutationFn: (data) => matchesService.createMatch({ ...data, orgId, tournamentId }),
+    mutationFn: (data) => repository.saveMatch(data),
     onSuccess: invalidate,
   })
   const saveResult = useMutation({
-    mutationFn: ({ id, result }) => matchesService.saveMatchResult(orgId, tournamentId, id, result),
+    mutationFn: ({ id, result }) => repository.saveMatchResult(id, result),
     onSuccess: invalidate,
   })
   const deleteMatch = useMutation({
-    mutationFn: (id) => matchesService.deleteMatchDoc(orgId, tournamentId, id),
+    mutationFn: (id) => repository.deleteMatch(id),
     onSuccess: invalidate,
   })
   const updateMatchSchedule = useMutation({
-    mutationFn: ({ id, data }) => matchesService.updateMatchDoc(orgId, tournamentId, id, data),
+    mutationFn: ({ id, data }) => repository.saveMatch({ id, ...data }),
     onSuccess: invalidate,
   })
   const setMatchLive = useMutation({
-    mutationFn: (id) => matchesService.updateMatchDoc(orgId, tournamentId, id, { status: 'live' }),
+    mutationFn: (id) => repository.setMatchStatus(id, 'live'),
     onSuccess: invalidate,
   })
   const updateLiveScore = useMutation({
-    mutationFn: ({ id, scoreA, scoreB, events }) => 
-      matchesService.updateMatchDoc(orgId, tournamentId, id, { result: { scoreA, scoreB, events } }),
+    mutationFn: ({ id, scoreA, scoreB, events }) =>
+      repository.updateLiveScore(id, { scoreA, scoreB, events }),
     onSuccess: invalidate,
   })
   const postponeMatch = useMutation({
-    mutationFn: (id) => matchesService.setMatchPostponed(orgId, tournamentId, id),
+    mutationFn: (id) => repository.setMatchStatus(id, 'postponed'),
     onSuccess: invalidate,
   })
   const restoreMatch = useMutation({
-    mutationFn: (id) => matchesService.restoreMatchScheduled(orgId, tournamentId, id),
+    mutationFn: (id) => repository.setMatchStatus(id, 'scheduled'),
     onSuccess: invalidate,
   })
   const generateSchedule = useMutation({
-    mutationFn: (matchesList) => matchesService.bulkCreateMatches(orgId, tournamentId, matchesList),
+    mutationFn: (matchesList) => repository.generateSchedule(matchesList),
     onSuccess: invalidate,
   })
 
-  return { 
-    createMatch, 
-    saveResult, 
+  return {
+    createMatch,
+    saveResult,
     deleteMatch,
     updateMatchSchedule,
     setMatchLive,
     updateLiveScore,
     postponeMatch,
     restoreMatch,
-    generateSchedule
+    generateSchedule,
   }
 }
