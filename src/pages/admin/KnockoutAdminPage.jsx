@@ -12,7 +12,7 @@ import { haptic } from '../../hooks/useHaptics'
 import DarkCard from '../../components/common/DarkCard'
 import TeamLogo from '../../components/common/TeamLogo'
 import ChangeTeamModal from './components/ChangeTeamModal'
-import KnockoutMatchFormModal from './components/KnockoutMatchFormModal'
+import MatchFormModal from './components/MatchFormModal'
 import KnockoutResultFormModal from './components/KnockoutResultFormModal'
 import KnockoutMatchCard from './components/KnockoutMatchCard'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
@@ -342,12 +342,13 @@ export default function KnockoutAdminPage() {
         </div>
 
         {/* Modal: Edit QF Match (Pre-confirm) */}
-        <KnockoutMatchFormModal
+        <MatchFormModal
           isOpen={matchFormModal.open}
           onClose={() => setMatchFormModal({ open: false, match: null, mode: 'full' })}
-          onSubmit={(data) => {
+          initialType="knockout"
+          onSubmit={(_payload) => {
             if (matchFormModal.match) {
-              koStore.updatePreConfirmMatch(matchFormModal.match.id, data)
+              koStore.updatePreConfirmMatch(matchFormModal.match.id, _payload)
             }
           }}
           match={matchFormModal.match}
@@ -503,10 +504,12 @@ export default function KnockoutAdminPage() {
       </div>
 
       {/* Modals for Step 3 */}
-      <KnockoutMatchFormModal
+      <MatchFormModal
         isOpen={matchFormModal.open}
         onClose={() => setMatchFormModal({ open: false, match: null, mode: 'full' })}
-        onSubmit={(data) => {
+        initialType="knockout"
+        onSubmit={({ kind, ...data }) => {
+          if (kind !== 'knockout') return
           if (matchFormModal.match) {
             if (matchFormModal.mode === 'schedule') {
               koStore.updateKOMatchSchedule(matchFormModal.match.id, data)

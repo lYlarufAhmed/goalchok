@@ -29,7 +29,6 @@ import LiveScoreModal from './components/LiveScoreModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import KnockoutMatchCard from './components/KnockoutMatchCard'
 import KnockoutResultFormModal from './components/KnockoutResultFormModal'
-import KnockoutMatchFormModal from './components/KnockoutMatchFormModal'
 import { getExpectedMatchCount } from '../../utils/scheduleGenerator'
 import { compareMatchesByDateTime } from '../../utils/matchHelpers'
 import { useI18n } from '../../i18n/useI18n'
@@ -487,11 +486,9 @@ export default function MatchesAdminPage() {
       <MatchFormModal
         isOpen={formOpen}
         onClose={() => setFormOpen(false)}
-        onSubmitGroup={async (data) => {
-          await createMatch.mutateAsync(data)
-        }}
-        onSubmitKnockout={(data) => {
-          koStore.addKOMatch(data)
+        onSubmit={async ({ kind, ...data }) => {
+          if (kind === 'group') await createMatch.mutateAsync(data)
+          else koStore.addKOMatch(data)
         }}
       />
 
@@ -553,10 +550,12 @@ export default function MatchesAdminPage() {
         teamB={getTeam(koResultModal.match?.teamB)}
       />
 
-      <KnockoutMatchFormModal
+      <MatchFormModal
         isOpen={koFormModal.open}
         onClose={() => setKoFormModal({ open: false, match: null, mode: 'full' })}
-        onSubmit={(data) => {
+        initialType="knockout"
+        onSubmit={({ kind, ...data }) => {
+          if (kind !== 'knockout') return
           if (koFormModal.match) {
             if (koFormModal.mode === 'schedule') {
               koStore.updateKOMatchSchedule(koFormModal.match.id, data)
