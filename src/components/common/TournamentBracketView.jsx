@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Trophy, Calendar, MapPin, Download, ChevronDown, FileText, Share2 } from 'lucide-react'
 import { useAppStore } from '../../stores/useAppStore'
 import { useKnockoutStore } from '../../stores/useKnockoutStore'
+import { TournamentEngine } from '../../domain/tournamentEngine'
 import { haptic } from '../../hooks/useHaptics'
 import TeamLogo from './TeamLogo'
 
@@ -48,37 +49,13 @@ export default function TournamentBracketView({ teams = [], isAdmin = false }) {
   }, [teams, koMatches])
 
   const bracketData = useMemo(() => {
-    const qf = { qf1: null, qf2: null, qf3: null, qf4: null }
-    const sf = { sf1: null, sf2: null }
-    let final = null
-
-    const matchesList = koMatches || []
-    matchesList.forEach((m) => {
-      const round = (m.round || '').toUpperCase()
-      const label = (m.matchLabel || '').toLowerCase()
-
-      if (round === 'QF' || round.includes('8') || round.includes('ربع')) {
-        if (label.includes('1')) qf.qf1 = m
-        else if (label.includes('2')) qf.qf2 = m
-        else if (label.includes('3')) qf.qf3 = m
-        else if (label.includes('4')) qf.qf4 = m
-        else {
-          const emptySlot = Object.keys(qf).find((key) => !qf[key])
-          if (emptySlot) qf[emptySlot] = m
-        }
-      } else if (round === 'SF' || round.includes('4') || round.includes('نصف')) {
-        if (label.includes('1')) sf.sf1 = m
-        else if (label.includes('2')) sf.sf2 = m
-        else {
-          const emptySlot = Object.keys(sf).find((key) => !sf[key])
-          if (emptySlot) sf[emptySlot] = m
-        }
-      } else if (round === 'F' || round.includes('FINAL') || round.includes('نهائي')) {
-        final = m
-      }
-    })
-
-    return { qf, sf, final }
+    // Slot resolution lives in the engine — the view only renders what it returns.
+    const bracket = new TournamentEngine([], [], koMatches || []).getBracket()
+    return {
+      qf: { qf1: bracket.QF[0], qf2: bracket.QF[1], qf3: bracket.QF[2], qf4: bracket.QF[3] },
+      sf: { sf1: bracket.SF[0], sf2: bracket.SF[1] },
+      final: bracket.F[0],
+    }
   }, [koMatches])
 
   const formatLabel = useCallback(

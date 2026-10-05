@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { generateQFPairings, getKnockoutWinner, generateKoId, isGroupStageComplete, getQualifiedTeams } from '../utils/knockoutUtils'
+import { generateQFPairings, isGroupStageComplete, getQualifiedTeams } from '../utils/knockoutUtils'
 import { TournamentEngine } from '../domain/tournamentEngine'
 import { MatchLifecycleService } from '../domain/matchLifecycleService'
 import { doc, setDoc, onSnapshot } from 'firebase/firestore'
@@ -340,99 +340,6 @@ export const useKnockoutStore = create((set, get) => {
         }))
       } catch (err) {
         console.error('[KnockoutStore] deleteKOMatch error:', err)
-      }
-    },
-
-    autoGenerateNextRound: async () => {
-      try {
-        const currentMatches = get().knockoutMatches
-        const qfMatches = currentMatches.filter(m => m.round === 'QF')
-        const sfMatches = currentMatches.filter(m => m.round === 'SF')
-        const finalMatches = currentMatches.filter(m => m.round === 'F')
-
-        // Generate SF if all QF are completed and no SF exist
-        if (qfMatches.length === 4 && qfMatches.every(m => m.status === 'completed') && sfMatches.length === 0) {
-          const qfWinners = qfMatches
-            .sort((a, b) => (a.matchLabel || '').localeCompare(b.matchLabel || ''))
-            .map(m => getKnockoutWinner(m))
-
-          if (qfWinners.every(Boolean)) {
-            const newSf1 = {
-              id: generateKoId(),
-              round: 'SF',
-              matchLabel: 'SF 1',
-              teamA: qfWinners[0],
-              teamB: qfWinners[3],
-              date: '', time: '', venue: 'ملاعب فيا',
-              status: 'scheduled', result: null,
-            }
-            const newSf2 = {
-              id: generateKoId(),
-              round: 'SF',
-              matchLabel: 'SF 2',
-              teamA: qfWinners[1],
-              teamB: qfWinners[2],
-              date: '', time: '', venue: 'ملاعب فيا',
-              status: 'scheduled', result: null,
-            }
-            await knockoutService.createKnockoutMatch(newSf1)
-            await knockoutService.createKnockoutMatch(newSf2)
-            set((state) => ({
-              knockoutMatches: [...state.knockoutMatches, newSf1, newSf2],
-            }))
-            console.log('[KnockoutStore] Generated Semi-Finals')
-            return true
-          } else {
-            console.warn('[KnockoutStore] Cannot generate SF - some QF matches have no clear winner')
-            return false
-          }
-        }
-        // Generate Final if all SF are completed and no Final exist
-        else if (sfMatches.length === 2 && sfMatches.every(m => m.status === 'completed') && finalMatches.length === 0) {
-          const sfWinners = sfMatches
-            .sort((a, b) => (a.matchLabel || '').localeCompare(b.matchLabel || ''))
-            .map(m => getKnockoutWinner(m))
-
-          if (sfWinners.every(Boolean)) {
-            const newFinal = {
-              id: generateKoId(),
-              round: 'F',
-              matchLabel: 'النهائي',
-              teamA: sfWinners[0],
-              teamB: sfWinners[1],
-              date: '', time: '', venue: 'ملاعب فيا',
-              status: 'scheduled', result: null,
-            }
-            await knockoutService.createKnockoutMatch(newFinal)
-            set((state) => ({
-              knockoutMatches: [...state.knockoutMatches, newFinal],
-            }))
-            console.log('[KnockoutStore] Generated Final')
-            return true
-          } else {
-            console.warn('[KnockoutStore] Cannot generate Final - some SF matches have no clear winner')
-            return false
-          }
-        } else {
-          // Provide feedback about why generation didn't happen
-          if (qfMatches.length < 4) {
-            console.warn('[KnockoutStore] Cannot generate - need 4 QF matches first')
-          } else if (!qfMatches.every(m => m.status === 'completed')) {
-            console.warn('[KnockoutStore] Cannot generate SF - all QF matches must be completed first')
-          } else if (sfMatches.length > 0) {
-            console.warn('[KnockoutStore] SF already exists')
-          } else if (sfMatches.length < 2) {
-            console.warn('[KnockoutStore] Cannot generate Final - need 2 SF matches first')
-          } else if (!sfMatches.every(m => m.status === 'completed')) {
-            console.warn('[KnockoutStore] Cannot generate Final - all SF matches must be completed first')
-          } else if (finalMatches.length > 0) {
-            console.warn('[KnockoutStore] Final already exists')
-          }
-          return false
-        }
-      } catch (err) {
-        console.error('[KnockoutStore] autoGenerateNextRound error:', err)
-        return false
       }
     },
 

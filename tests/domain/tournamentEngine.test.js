@@ -183,4 +183,19 @@ describe('TournamentEngine — Deep Domain Module', () => {
       expect(standings[1].id).toBe('a2')
     })
   })
+
+  it('resolves bracket slots by matchNumber, label digit, then arrival order', () => {
+    const engine = new TournamentEngine([], [], [
+      { id: 'f1', round: 'F', matchLabel: 'النهائي', status: 'scheduled', result: null },
+      { id: 'sf2', round: 'SF', matchLabel: 'SF 2', status: 'scheduled', result: null },
+      { id: 'qfB', round: 'QF', matchNumber: 2, matchLabel: null, status: 'scheduled', result: null },
+      { id: 'qfA', round: 'QF', matchLabel: 'QF 1', status: 'scheduled', result: null },
+      { id: 'qfC', round: 'QF', matchLabel: 'unlabeled', status: 'scheduled', result: null },
+    ])
+
+    const bracket = engine.getBracket()
+    expect(bracket.QF.map((m) => m && m.id)).toEqual(['qfA', 'qfB', 'qfC', null])
+    expect(bracket.SF.map((m) => m && m.id)).toEqual([null, 'sf2'])
+    expect(bracket.F.map((m) => m && m.id)).toEqual(['f1'])
+  })
 })
