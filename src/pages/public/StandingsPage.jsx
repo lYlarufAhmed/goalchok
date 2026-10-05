@@ -8,15 +8,15 @@ import { useTranslation } from '../../hooks/useTranslation'
 import { calculateStandings } from '../../utils/standings'
 import { getBestThirdPlacedTeamIds } from '../../utils/knockoutUtils'
 import { haptic } from '../../hooks/useHaptics'
-import { useRealtimeTeamsQuery, useRealtimeMatchesQuery } from '../../hooks/useRealtimeQueries'
+import { useTeamsSubscription, useMatchesSubscription } from '../../hooks/useTournamentRepository'
 
 const GROUPS = ['A', 'B', 'C']
 
 export default function StandingsPage() {
   const { t, lang } = useTranslation()
   const [activeGroup, setActiveGroup] = useState('A')
-  const { data: teams = [], isLoading: teamsLoading, isError: teamsError, refetch: refetchTeams } = useRealtimeTeamsQuery()
-  const { data: matches = [], isLoading: matchesLoading, isError: matchesError, refetch: refetchMatches } = useRealtimeMatchesQuery()
+  const { data: teams = [], isLoading: teamsLoading, isError: teamsError, refetch: refetchTeams } = useTeamsSubscription()
+  const { data: matches = [], isLoading: matchesLoading, isError: matchesError, refetch: refetchMatches } = useMatchesSubscription()
 
   const standings = useMemo(
     () => calculateStandings(teams, matches, activeGroup),
