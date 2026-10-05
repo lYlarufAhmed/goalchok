@@ -6,7 +6,7 @@ import GoldButton from '../../components/common/GoldButton'
 import DarkCard from '../../components/common/DarkCard'
 import EmptyState from '../../components/common/EmptyState'
 import { useTeamsQuery, useTeamMutations } from '../../hooks/useQueries'
-import { MAX_TEAMS } from '../../stores/useTeamsStore' // We'll eventually move MAX_TEAMS out too
+import { MAX_TEAMS } from '../../utils/tournamentLimits'
 import TeamFormModal from './components/TeamFormModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import TeamLogo from '../../components/common/TeamLogo'

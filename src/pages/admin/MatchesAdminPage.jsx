@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { haptic } from '../../hooks/useHaptics'
 import { useTeamsQuery, useMatchesQuery, useMatchMutations } from '../../hooks/useQueries'
-import { isDrawComplete } from '../../stores/useTeamsStore' // Move later
+import { isDrawComplete } from '../../utils/tournamentLimits'
 import { buildFullSchedule } from '../../utils/scheduleGenerator'
 import { useKnockoutStore } from '../../stores/useKnockoutStore'
 import EmptyState from '../../components/common/EmptyState'
