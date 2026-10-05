@@ -2,11 +2,17 @@ import { create } from 'zustand'
 import { generateQFPairings, isGroupStageComplete, getQualifiedTeams } from '../utils/knockoutUtils'
 import { TournamentEngine } from '../domain/tournamentEngine'
 import { MatchLifecycleService } from '../domain/matchLifecycleService'
-import { doc, setDoc, onSnapshot } from 'firebase/firestore'
+import * as knockoutService from '../services/knockoutService'
+import { resolveCurrentTenant } from '../services/tenantContext'
 
 const lifecycleService = new MatchLifecycleService()
-import { db } from '../config/firebase'
-import * as knockoutService from '../services/knockoutService'
+// Current tenant at call time, as positional (orgId, tournamentId) args —
+// resolves the signed-in org claim, falling back to the shared default
+// (which carries no authorization).
+const tenant = () => {
+  const { orgId, tournamentId } = resolveCurrentTenant()
+  return [orgId, tournamentId]
+}
 import {
   setLiveMatch,
   clearLiveMatch,
@@ -24,11 +30,7 @@ const getIsTest = () => {
 const saveSettingsToFirestore = async (state) => {
   if (getIsTest()) return
   try {
-    await setDoc(doc(db, 'settings', 'knockout'), {
-      step: state.step,
-      qualifiedTeams: state.qualifiedTeams,
-      champion: state.champion,
-    })
+    await knockoutService.saveKnockoutState(...tenant(), state)
   } catch (err) {
     console.error('[KnockoutStore] save settings error:', err)
   }
@@ -59,15 +61,18 @@ export const useKnockoutStore = create((set, get) => {
 
       try {
         set({ loading: true })
-        const matches = await knockoutService.fetchKnockoutMatches()
+        const { orgId, tournamentId } = resolveCurrentTenant()
+        const matches = await knockoutService.fetchKnockoutMatches(orgId, tournamentId)
         set({ knockoutMatches: matches, loading: false })
       } catch (err) {
         console.error('[KnockoutStore] fetch matches error:', err)
         set({ loading: false, error: err.message })
       }
 
-      const unsub = onSnapshot(
-        doc(db, 'settings', 'knockout'),
+      const { orgId, tournamentId } = resolveCurrentTenant()
+      const unsub = knockoutService.subscribeKnockoutState(
+        orgId,
+        tournamentId,
         (snapshot) => {
           if (snapshot.exists()) {
             const data = snapshot.data()
@@ -105,7 +110,7 @@ export const useKnockoutStore = create((set, get) => {
         qualifiedTeams,
         champion: null,
       })
-      await knockoutService.clearKnockoutMatches()
+      await knockoutService.clearKnockoutMatches(...tenant())
       set({ knockoutMatches: [] })
     },
 
@@ -156,7 +161,7 @@ export const useKnockoutStore = create((set, get) => {
       const { knockoutMatches } = get()
       setAndSyncSettings({ step: 3 })
       try {
-        await knockoutService.syncKnockoutMatches(knockoutMatches)
+        await knockoutService.syncKnockoutMatches(...tenant(), knockoutMatches)
       } catch (err) {
         console.error('[KnockoutStore] confirmBracket error:', err)
         set({ error: err.message })
@@ -170,7 +175,7 @@ export const useKnockoutStore = create((set, get) => {
         champion: null,
       })
       try {
-        await knockoutService.clearKnockoutMatches()
+        await knockoutService.clearKnockoutMatches(...tenant())
         set({ knockoutMatches: [] })
       } catch (err) {
         console.error('[KnockoutStore] resetKnockout error:', err)
@@ -182,7 +187,7 @@ export const useKnockoutStore = create((set, get) => {
     updateKOMatchSchedule: async (id, { date, time, venue }) => {
       try {
         const updates = { date, time, venue: (venue || '').trim() }
-        await knockoutService.updateKnockoutMatch(id, updates)
+        await knockoutService.updateKnockoutMatch(...tenant(), id, updates)
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
             m.id === id ? { ...m, ...updates } : m
@@ -195,7 +200,7 @@ export const useKnockoutStore = create((set, get) => {
 
     updateKOMatch: async (id, changes) => {
       try {
-        await knockoutService.updateKnockoutMatch(id, changes)
+        await knockoutService.updateKnockoutMatch(...tenant(), id, changes)
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
             m.id === id ? { ...m, ...changes } : m
@@ -210,7 +215,7 @@ export const useKnockoutStore = create((set, get) => {
       try {
         const match = get().knockoutMatches.find((m) => m.id === id)
         const updatedMatch = lifecycleService.startMatch(match || { id, status: 'scheduled' })
-        await knockoutService.updateKnockoutMatch(id, { status: 'live', result: updatedMatch.result })
+        await knockoutService.updateKnockoutMatch(...tenant(), id, { status: 'live', result: updatedMatch.result })
         await setLiveMatch(id, { scoreA: 0, scoreB: 0, status: 'live', events: [] })
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
@@ -230,7 +235,7 @@ export const useKnockoutStore = create((set, get) => {
           { scoreA, scoreB }
         )
         await updateLiveScoreRtdb(id, updatedMatch.result.scoreA, updatedMatch.result.scoreB, [])
-        await knockoutService.updateKnockoutMatch(id, { status: 'live', result: updatedMatch.result })
+        await knockoutService.updateKnockoutMatch(...tenant(), id, { status: 'live', result: updatedMatch.result })
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
             m.id === id ? { ...m, result: updatedMatch.result } : m
@@ -245,7 +250,7 @@ export const useKnockoutStore = create((set, get) => {
       try {
         const match = get().knockoutMatches.find((m) => m.id === id)
         const updatedMatch = lifecycleService.postponeMatch(match || { id, status: 'scheduled' })
-        await knockoutService.updateKnockoutMatch(id, { status: 'postponed', result: null })
+        await knockoutService.updateKnockoutMatch(...tenant(), id, { status: 'postponed', result: null })
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
             m.id === id ? { ...m, ...updatedMatch } : m
@@ -260,7 +265,7 @@ export const useKnockoutStore = create((set, get) => {
       try {
         const match = get().knockoutMatches.find((m) => m.id === id)
         const updatedMatch = lifecycleService.resetMatch(match || { id, status: 'postponed' })
-        await knockoutService.updateKnockoutMatch(id, { status: 'scheduled', result: null })
+        await knockoutService.updateKnockoutMatch(...tenant(), id, { status: 'scheduled', result: null })
         set((state) => ({
           knockoutMatches: state.knockoutMatches.map((m) =>
             m.id === id ? { ...m, ...updatedMatch } : m
@@ -281,7 +286,7 @@ export const useKnockoutStore = create((set, get) => {
         )
         const updatedResult = updatedMatch.result
 
-        await knockoutService.updateKnockoutMatch(id, { status: 'completed', result: updatedResult })
+        await knockoutService.updateKnockoutMatch(...tenant(), id, { status: 'completed', result: updatedResult })
         await clearLiveMatch(id).catch(() => {})
 
         let nextMatches = get().knockoutMatches.map((m) =>
@@ -293,7 +298,7 @@ export const useKnockoutStore = create((set, get) => {
         const { newMatches, champion: evaluatedChampion } = engine.evaluateKnockoutProgression()
 
         for (const nm of newMatches) {
-          await knockoutService.createKnockoutMatch(nm)
+          await knockoutService.createKnockoutMatch(...tenant(), nm)
         }
         if (newMatches.length > 0) {
           nextMatches = [...nextMatches, ...newMatches]
@@ -311,7 +316,7 @@ export const useKnockoutStore = create((set, get) => {
 
     addKOMatch: async (matchData) => {
       try {
-        const newMatch = await knockoutService.createKnockoutMatch({
+        const newMatch = await knockoutService.createKnockoutMatch(...tenant(), {
           round: matchData.round || 'QF',
           matchLabel: matchData.matchLabel || matchData.round || 'QF',
           teamA: matchData.teamA || '',
@@ -334,7 +339,7 @@ export const useKnockoutStore = create((set, get) => {
 
     deleteKOMatch: async (id) => {
       try {
-        await knockoutService.deleteKnockoutMatch(id)
+        await knockoutService.deleteKnockoutMatch(...tenant(), id)
         set((state) => ({
           knockoutMatches: state.knockoutMatches.filter((m) => m.id !== id),
         }))
@@ -358,10 +363,10 @@ export const useKnockoutStore = create((set, get) => {
         const qfMatches = generateQFPairings(qualifiedTeams)
         
         // Clear existing knockout matches and create new ones
-        await knockoutService.clearKnockoutMatches()
+        await knockoutService.clearKnockoutMatches(...tenant())
         
         for (const match of qfMatches) {
-          await knockoutService.createKnockoutMatch(match)
+          await knockoutService.createKnockoutMatch(...tenant(), match)
         }
         
         // Update store

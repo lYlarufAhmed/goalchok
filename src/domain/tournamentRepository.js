@@ -8,6 +8,7 @@ import * as liveMatchService from '../services/liveMatchService'
 import { getTenantCollection, getTenantDoc } from '../services/tenantContext'
 import { MatchLifecycleService } from './matchLifecycleService'
 import { generateUUID } from '../utils/uuid'
+import tenant from '../../shared/tenant.json'
 
 const lifecycle = new MatchLifecycleService()
 
@@ -175,41 +176,41 @@ export class FirebaseTournamentRepository {
   // --- Knockout ---
 
   async fetchKnockoutMatches() {
-    return knockoutService.fetchKnockoutMatches()
+    return knockoutService.fetchKnockoutMatches(this.orgId, this.tournamentId)
   }
 
   async createKnockoutMatch(match) {
-    return knockoutService.createKnockoutMatch(match)
+    return knockoutService.createKnockoutMatch(this.orgId, this.tournamentId, match)
   }
 
   async updateKnockoutMatch(id, updates) {
-    return knockoutService.updateKnockoutMatch(id, updates)
+    return knockoutService.updateKnockoutMatch(this.orgId, this.tournamentId, id, updates)
   }
 
   async deleteKnockoutMatch(id) {
-    return knockoutService.deleteKnockoutMatch(id)
+    return knockoutService.deleteKnockoutMatch(this.orgId, this.tournamentId, id)
   }
 
   async clearKnockoutMatches() {
-    return knockoutService.clearKnockoutMatches()
+    return knockoutService.clearKnockoutMatches(this.orgId, this.tournamentId)
   }
 
   // --- Groups & Settings ---
 
   async fetchGroups() {
-    return groupsService.fetchGroups()
+    return groupsService.fetchGroups(this.orgId, this.tournamentId)
   }
 
   async saveGroups(groups) {
-    return groupsService.saveGroups(groups)
+    return groupsService.saveGroups(this.orgId, this.tournamentId, groups)
   }
 
   async fetchSettings() {
-    return settingsService.fetchSettings()
+    return settingsService.fetchSettings(this.orgId, this.tournamentId)
   }
 
   async saveSettings(updates) {
-    return settingsService.updateSettings(updates)
+    return settingsService.updateSettings(this.orgId, this.tournamentId, updates)
   }
 
   // --- Orchestration ---
@@ -220,7 +221,7 @@ export class FirebaseTournamentRepository {
    * leaking into a hook.
    */
   async assignGroups(groups) {
-    await groupsService.saveGroups(groups)
+    await groupsService.saveGroups(this.orgId, this.tournamentId, groups)
 
     const groupMap = {}
     Object.entries(groups).forEach(([group, teamIds]) => {
@@ -231,7 +232,7 @@ export class FirebaseTournamentRepository {
     })
     await teamsService.updateTeamGroups(this.orgId, this.tournamentId, groupMap)
 
-    await settingsService.updateSettings({ drawLocked: true })
+    await settingsService.updateSettings(this.orgId, this.tournamentId, { drawLocked: true })
   }
 
   /**
@@ -239,12 +240,12 @@ export class FirebaseTournamentRepository {
    * group, and unlock the draw.
    */
   async clearGroups(teams) {
-    await groupsService.clearGroupsDoc()
+    await groupsService.clearGroupsDoc(this.orgId, this.tournamentId)
 
     const teamIds = teams.map((t) => t.id)
     await teamsService.clearAllTeamGroups(this.orgId, this.tournamentId, teamIds)
 
-    await settingsService.updateSettings({ drawLocked: false })
+    await settingsService.updateSettings(this.orgId, this.tournamentId, { drawLocked: false })
   }
 }
 
@@ -254,7 +255,7 @@ export class FirebaseTournamentRepository {
  * both Firestore snapshot docs and plain objects.
  */
 export class InMemoryTournamentRepository {
-  constructor({ orgId = 'default-org', tournamentId = 'default-tournament' } = {}) {
+  constructor({ orgId = tenant.defaultOrg, tournamentId = tenant.defaultTournament } = {}) {
     this.orgId = orgId
     this.tournamentId = tournamentId
     this.teams = new Map()
