@@ -25,8 +25,6 @@ export default function MatchFormModal({
   isOpen,
   onClose,
   onSubmit,
-  onSubmitGroup,
-  onSubmitKnockout,
   match = null,
   teams: propTeams = null,
   initialType = 'group',
@@ -94,18 +92,14 @@ export default function MatchFormModal({
     if (!validate()) return
     haptic.intense()
 
-    const payload = {
-      ...form,
-      venue: form.venue.trim(),
-    }
-
-    if (onSubmit) {
-      onSubmit(payload)
-    } else if (matchType === 'group') {
-      onSubmitGroup?.({ group: form.group, teamA: form.teamA, teamB: form.teamB, date: form.date, time: form.time, venue: form.venue })
-    } else {
-      onSubmitKnockout?.({ round: form.round, teamA: form.teamA, teamB: form.teamB, date: form.date, time: form.time, venue: form.venue })
-    }
+    // One callback carries the match kind so callers never memorize a
+    // precedence rule between competing handlers.
+    const kind = matchType
+    const shared = { teamA: form.teamA, teamB: form.teamB, date: form.date, time: form.time, venue: form.venue.trim() }
+    onSubmit?.(kind === 'group'
+      ? { kind, group: form.group, ...shared }
+      : { kind, round: form.round, ...shared }
+    )
     onClose()
   }
 

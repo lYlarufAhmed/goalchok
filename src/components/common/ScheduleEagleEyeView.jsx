@@ -8,8 +8,6 @@ import {
   X,
   ExternalLink,
 } from 'lucide-react'
-import { useTeamsStore } from '../../stores/useTeamsStore'
-import { useMatchesStore } from '../../stores/useMatchesStore'
 import { useAppStore } from '../../stores/useAppStore'
 import { haptic } from '../../hooks/useHaptics'
 import DownloadButton from './DownloadButton'
@@ -26,13 +24,11 @@ const STATUS_BADGE = {
 
 export default function ScheduleEagleEyeView({
   className = '',
-  teamsOverride,
-  matchesOverride,
+  teams = [],
+  matches = [],
 }) {
   const lang = useAppStore((s) => s.language)
   const theme = useAppStore((s) => s.theme)
-  const storeTeams = useTeamsStore((s) => s.teams)
-  const storeMatches = useMatchesStore((s) => s.matches)
   const containerRef = useRef(null)
   const [capturing, setCapturing] = useState(false)
   const [shareModal, setShareModal] = useState(false)
@@ -40,10 +36,6 @@ export default function ScheduleEagleEyeView({
   const [filterGroup, setFilterGroup] = useState('all')
 
   const isAr = lang === 'ar'
-
-  // Use override props if provided, otherwise fall back to Zustand stores
-  const teams = teamsOverride || storeTeams
-  const matches = matchesOverride || storeMatches
 
   const teamsById = useMemo(() => {
     const map = {}
