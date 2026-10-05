@@ -34,6 +34,8 @@ export class TournamentEngine {
         gf: 0,
         ga: 0,
         pts: 0,
+        yellow: 0,
+        red: 0,
       }
     })
 
@@ -68,15 +70,100 @@ export class TournamentEngine {
         teamA.pts++
         teamB.pts++
       }
+
+      // Disciplinary counts feed the Tie-Breaker (CONTEXT.md: GD > GF > H2H > Disciplinary)
+      const cards = match.result.cards || []
+      teamA.yellow += cards.filter((c) => c.type === 'yellow' && c.teamId === match.teamA).length
+      teamB.yellow += cards.filter((c) => c.type === 'yellow' && c.teamId === match.teamB).length
+      teamA.red += cards.filter((c) => c.type === 'red' && c.teamId === match.teamA).length
+      teamB.red += cards.filter((c) => c.type === 'red' && c.teamId === match.teamB).length
+      teamA.yellow += (match.result.yellowCards || []).filter((c) => c.teamId === match.teamA).length
+      teamB.yellow += (match.result.yellowCards || []).filter((c) => c.teamId === match.teamB).length
+      teamA.red += (match.result.redCards || []).filter((c) => c.teamId === match.teamA).length
+      teamB.red += (match.result.redCards || []).filter((c) => c.teamId === match.teamB).length
     })
 
-    return Object.values(table).sort((a, b) => {
+    return this._applyTieBreakers(Object.values(table), groupMatches)
+  }
+
+  /**
+   * Sort standings by the documented Tie-Breaker chain:
+   * pts > GD > GF > Head-to-Head (among tied teams) > Disciplinary.
+   * Head-to-head is group-relative, so it is applied per tied partition,
+   * not as a pairwise comparator.
+   */
+  _applyTieBreakers(entries, groupMatches) {
+    const gd = (e) => e.gf - e.ga
+    const discard = (e) => e.yellow + e.red * 3
+
+    entries.sort((a, b) => {
       if (b.pts !== a.pts) return b.pts - a.pts
-      const diffA = a.gf - a.ga
-      const diffB = b.gf - b.ga
-      if (diffB !== diffA) return diffB - diffA
+      if (gd(b) !== gd(a)) return gd(b) - gd(a)
       return b.gf - a.gf
     })
+
+    // Partition teams still tied on pts/GD/GF and rank each partition
+    // by its head-to-head mini-league, then disciplinary record.
+    let i = 0
+    while (i < entries.length) {
+      let j = i + 1
+      while (
+        j < entries.length &&
+        entries[j].pts === entries[i].pts &&
+        gd(entries[j]) === gd(entries[i]) &&
+        entries[j].gf === entries[i].gf
+      ) {
+        j++
+      }
+
+      if (j - i > 1) {
+        const tied = entries.slice(i, j)
+        const ids = new Set(tied.map((e) => e.id))
+        const h2h = {}
+        tied.forEach((e) => {
+          h2h[e.id] = { pts: 0, gf: 0, ga: 0 }
+        })
+
+        groupMatches.forEach((match) => {
+          if (!ids.has(match.teamA) || !ids.has(match.teamB)) return
+          const { scoreA, scoreB } = match.result
+          h2h[match.teamA].gf += scoreA
+          h2h[match.teamA].ga += scoreB
+          h2h[match.teamB].gf += scoreB
+          h2h[match.teamB].ga += scoreA
+          if (scoreA > scoreB) h2h[match.teamA].pts += 3
+          else if (scoreB > scoreA) h2h[match.teamB].pts += 3
+          else {
+            h2h[match.teamA].pts++
+            h2h[match.teamB].pts++
+          }
+        })
+
+        const order = new Map()
+        tied
+          .slice()
+          .sort((a, b) => {
+            const ha = h2h[a.id]
+            const hb = h2h[b.id]
+            if (hb.pts !== ha.pts) return hb.pts - ha.pts
+            if (hb.gf - hb.ga !== ha.gf - ha.ga) return hb.gf - hb.ga - (ha.gf - ha.ga)
+            if (hb.gf !== ha.gf) return hb.gf - ha.gf
+            return discard(a) - discard(b)
+          })
+          .forEach((e, idx) => order.set(e.id, idx))
+
+        entries
+          .slice(i, j)
+          .sort((a, b) => order.get(a.id) - order.get(b.id))
+          .forEach((e, idx) => {
+            entries[i + idx] = e
+          })
+      }
+
+      i = j
+    }
+
+    return entries
   }
 
   /**
@@ -137,6 +224,8 @@ export class TournamentEngine {
         pts: third.pts,
         gd: third.gf - third.ga,
         gf: third.gf,
+        yellow: third.yellow || 0,
+        red: third.red || 0,
         qualifyType: 'bestThird',
       }
     }).filter(Boolean)
@@ -144,7 +233,10 @@ export class TournamentEngine {
     thirds.sort((a, b) => {
       if (b.pts !== a.pts) return b.pts - a.pts
       if (b.gd !== a.gd) return b.gd - a.gd
-      return b.gf - a.gf
+      if (b.gf !== a.gf) return b.gf - a.gf
+      // Thirds come from different groups, so head-to-head cannot apply;
+      // disciplinary record is the remaining documented criterion.
+      return (a.yellow + a.red * 3 || 0) - (b.yellow + b.red * 3 || 0)
     })
 
     thirds.slice(0, 2).forEach((t) => {

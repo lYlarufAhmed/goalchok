@@ -104,8 +104,7 @@ describe('TournamentEngine — Deep Domain Module', () => {
     expect(Array.isArray(qualified)).toBe(true)
   })
 
-  it('should evaluate knockout progression and auto-generate semi-finals when 4 QFs are completed', () => {
-    const qfMatches = [
+  it('should evaluate knockout progression and auto-generate semi-finals when 4 QFs are completed', () => {    const qfMatches = [
       { id: 'qf1', round: 'QF', matchLabel: 'QF 1', teamA: 't1', teamB: 't8', status: 'completed', result: { scoreA: 2, scoreB: 0 } },
       { id: 'qf2', round: 'QF', matchLabel: 'QF 2', teamA: 't2', teamB: 't7', status: 'completed', result: { scoreA: 1, scoreB: 0 } },
       { id: 'qf3', round: 'QF', matchLabel: 'QF 3', teamA: 't3', teamB: 't6', status: 'completed', result: { scoreA: 3, scoreB: 1 } },
@@ -121,5 +120,67 @@ describe('TournamentEngine — Deep Domain Module', () => {
     expect(progression.newMatches[0].teamB).toBe('t4') // W_QF4
     expect(progression.newMatches[1].teamA).toBe('t2') // W_QF2
     expect(progression.newMatches[1].teamB).toBe('t3') // W_QF3
+  })
+
+  describe('Tie-Breaker chain (CONTEXT.md: pts > GD > GF > Head-to-Head > Disciplinary)', () => {
+    const tiedTeams = [
+      { id: 'a1', name: 'Alpha', group: 'A' },
+      { id: 'a2', name: 'Beta', group: 'A' },
+      { id: 'a3', name: 'Gamma', group: 'A' },
+      { id: 'a4', name: 'Delta', group: 'A' },
+    ]
+
+    const match = (id, teamA, teamB, scoreA, scoreB, cards = {}) => ({
+      id,
+      group: 'A',
+      teamA,
+      teamB,
+      status: 'completed',
+      result: { scoreA, scoreB, scorers: [], ...cards },
+    })
+
+    it('ranks teams level on pts/GD/GF by head-to-head mini-league', () => {
+      // a1/a2/a3 finish level on 6 pts, GD +2, GF 4; their mini-league is a
+      // cycle of wins so h2h GD decides: a3 (+1) > a1 (0) > a2 (-1).
+      const matches = [
+        match('m1', 'a3', 'a1', 2, 0),
+        match('m2', 'a1', 'a2', 2, 0),
+        match('m3', 'a2', 'a3', 1, 0),
+        match('m4', 'a1', 'a4', 2, 0),
+        match('m5', 'a2', 'a4', 3, 0),
+        match('m6', 'a3', 'a4', 2, 1),
+      ]
+
+      const standings = new TournamentEngine(tiedTeams, matches).getStandings('A')
+      expect(standings.map((s) => s.id)).toEqual(['a3', 'a1', 'a2', 'a4'])
+    })
+
+    it('breaks remaining h2h ties by disciplinary record (fewer cards first)', () => {
+      // All four teams level on pts/GD/GF and h2h (all draws); only cards differ.
+      const matches = [
+        match('m1', 'a1', 'a2', 1, 1, { redCards: [{ player: 'x', teamId: 'a2' }, { player: 'y', teamId: 'a2' }] }),
+        match('m2', 'a3', 'a4', 1, 1),
+        match('m3', 'a1', 'a3', 1, 1, { yellowCards: [{ player: 'z', teamId: 'a1' }] }),
+        match('m4', 'a2', 'a4', 1, 1),
+        match('m5', 'a1', 'a4', 1, 1),
+        match('m6', 'a2', 'a3', 1, 1),
+      ]
+
+      const standings = new TournamentEngine(tiedTeams, matches).getStandings('A')
+      const a1 = standings.findIndex((s) => s.id === 'a1')
+      const a2 = standings.findIndex((s) => s.id === 'a2')
+      expect(a1).toBeLessThan(a2) // a1: 1 discard pt, a2: 2 reds = 6 discard pts
+    })
+
+    it('does not change ordering when no teams are tied', () => {
+      const matches = [
+        match('m1', 'a1', 'a4', 2, 0),
+        match('m2', 'a2', 'a3', 1, 0),
+      ]
+      const standings = new TournamentEngine(tiedTeams, matches).getStandings('A')
+      expect(standings.map((s) => s.pts)).toEqual([3, 3, 0, 0])
+      expect(standings[0].id).toBe('a1')
+      expect(standings[1].id).toBe('a2')
+    })
   })
 })
