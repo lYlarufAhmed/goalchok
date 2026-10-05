@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from './helpers'
 
 test.describe('Top Scorers Team Name E2E Test', () => {
   test('should display team name alongside top scorer on top-scorers page', async ({ page }) => {
@@ -6,21 +7,19 @@ test.describe('Top Scorers Team Name E2E Test', () => {
     await page.goto('/admin/login')
     await expect(page.locator('h1').filter({ hasText: /لوحة التحكم|Admin Panel/ })).toBeVisible()
     
-    const pinInput = page.locator('input[type="password"]')
-    await pinInput.fill('7391')
+    const emailInput = page.locator('input[type="email"]')
+    await emailInput.fill(ADMIN_EMAIL)
+    const passwordInput = page.locator('input[type="password"]')
+    await passwordInput.fill(ADMIN_PASSWORD)
     await page.locator('button[type="submit"]').click()
 
     // Wait for Dashboard page to load after login redirect
     await page.waitForURL('**/admin/dashboard')
     await page.waitForTimeout(1000)
 
-    // 2. Navigate to Matches Admin Page via sidebar link to preserve auth state
-    const matchesLink = page.locator('a[href="/admin/matches"]')
-    if (await matchesLink.count() > 0) {
-      await matchesLink.first().click()
-    } else {
-      await page.goto('/admin/matches')
-    }
+    // Navigate directly — the dashboard's /admin/matches link sits in the
+    // mobile-only bottom nav, invisible at the desktop viewport.
+    await page.goto('/admin/matches')
     await page.waitForTimeout(1000)
 
     // Click Auto-Generate Schedule if visible to populate matches

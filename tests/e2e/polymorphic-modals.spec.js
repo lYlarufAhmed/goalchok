@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from './helpers'
 
 test.describe('Polymorphic Match & Result Modals E2E Test', () => {
   test('should test match creation and result modal with penalty shootout selection in headed mode', async ({ page }) => {
@@ -6,8 +7,10 @@ test.describe('Polymorphic Match & Result Modals E2E Test', () => {
     await page.goto('/admin/login')
     await page.waitForTimeout(500)
 
-    const pinInput = page.locator('input[type="password"]')
-    await pinInput.fill('7391')
+    const emailInput = page.locator('input[type="email"]')
+    await emailInput.fill(ADMIN_EMAIL)
+    const passwordInput = page.locator('input[type="password"]')
+    await passwordInput.fill(ADMIN_PASSWORD)
     await page.locator('button[type="submit"]').click()
 
     // Wait for Dashboard page to load after login redirect
@@ -27,12 +30,9 @@ test.describe('Polymorphic Match & Result Modals E2E Test', () => {
       // Verify MatchFormModal is visible
       await expect(page.locator('form')).toBeVisible()
 
-      // Close modal
-      const closeBtn = page.locator('button').filter({ has: page.locator('svg') }).first()
-      if (await closeBtn.isVisible()) {
-        await closeBtn.click()
-        await page.waitForTimeout(800)
-      }
+      // Close modal via the X button inside the modal overlay
+      await page.locator('div.fixed.inset-0.z-50 button:has(svg.lucide-x)').first().click()
+      await page.waitForTimeout(800)
     }
 
     // 4. Test ResultFormModal on Group Stage Match
@@ -50,9 +50,8 @@ test.describe('Polymorphic Match & Result Modals E2E Test', () => {
         const modalHeading = page.getByRole('heading', { name: /تسجيل النتيجة|تعديل النتيجة|إنهاء المباراة|Record Result|Edit Result|End Match/ })
         await expect(modalHeading).toBeVisible()
 
-        // Close modal
-        const closeModalBtn = page.locator('button').filter({ has: page.locator('svg') }).first()
-        await closeModalBtn.click()
+        // Close modal via the X button inside the modal overlay
+        await page.locator('div.fixed.inset-0.z-50 button:has(svg.lucide-x)').first().click()
         await page.waitForTimeout(800)
       }
     }
@@ -92,9 +91,8 @@ test.describe('Polymorphic Match & Result Modals E2E Test', () => {
             await page.waitForTimeout(1500)
           }
 
-          // Close modal
-          const closeModalBtn = page.locator('button').filter({ has: page.locator('svg') }).first()
-          await closeModalBtn.click()
+          // Close modal via the X button inside the modal overlay
+          await page.locator('div.fixed.inset-0.z-50 button:has(svg.lucide-x)').first().click()
           await page.waitForTimeout(800)
         }
       }

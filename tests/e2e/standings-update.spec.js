@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from './helpers'
 
 test.describe('Standings Auto-Update Reproduction Test', () => {
   test('should automatically update standings table after match result is recorded', async ({ page }) => {
@@ -10,21 +11,19 @@ test.describe('Standings Auto-Update Reproduction Test', () => {
     await page.goto('/admin/login')
     await expect(page.locator('h1').filter({ hasText: /لوحة التحكم|Admin Panel/ })).toBeVisible()
     
-    const pinInput = page.locator('input[type="password"]')
-    await pinInput.fill('7391')
+    const emailInput = page.locator('input[type="email"]')
+    await emailInput.fill(ADMIN_EMAIL)
+    const passwordInput = page.locator('input[type="password"]')
+    await passwordInput.fill(ADMIN_PASSWORD)
     await page.locator('button[type="submit"]').click()
 
     // Wait for Dashboard page to load after login redirect
     await page.waitForURL('**/admin/dashboard')
     await page.waitForTimeout(1000)
 
-    // 3. Navigate to Matches Admin Page via client-side link
-    const matchesLink = page.locator('a[href="/admin/matches"]')
-    if (await matchesLink.count() > 0) {
-      await matchesLink.first().click()
-    } else {
-      await page.goto('/admin/matches')
-    }
+    // Navigate directly — the dashboard's /admin/matches link sits in the
+    // mobile-only bottom nav, invisible at the desktop viewport.
+    await page.goto('/admin/matches')
     await page.waitForTimeout(1000)
 
     // Click Auto-Generate Schedule if visible

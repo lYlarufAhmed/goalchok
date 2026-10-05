@@ -15,8 +15,8 @@
     "test:rules": "firebase emulators:exec --only firestore,database \"vitest run tests/rules\"",
     "emulator": "firebase emulators:start",
     "seed:emulator": "node scripts/seed-emulator.js",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e": "firebase emulators:exec --only firestore,database,auth \"node scripts/seed-emulator.js && playwright test\"",
+    "test:e2e:ui": "firebase emulators:exec --only firestore,database,auth \"node scripts/seed-emulator.js && playwright test --ui\""
   },
   "dependencies": {
     "@fontsource/cairo": "^5.2.7",
