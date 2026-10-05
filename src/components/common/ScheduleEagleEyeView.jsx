@@ -1,27 +1,19 @@
 import { useRef, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Download,
   Share2,
   Calendar,
-  Clock,
   MapPin,
-  CheckCircle,
   Zap,
-  Compass,
-  ChevronDown,
-  FileText,
   X,
   ExternalLink,
 } from 'lucide-react'
-import DarkCard from './DarkCard'
 import { useTeamsStore } from '../../stores/useTeamsStore'
 import { useMatchesStore } from '../../stores/useMatchesStore'
 import { useAppStore } from '../../stores/useAppStore'
 import { haptic } from '../../hooks/useHaptics'
 import DownloadButton from './DownloadButton'
 
-const GROUPS = ['A', 'B', 'C']
 const GROUP_LABELS = { A: 'المجموعة أ', B: 'المجموعة ب', C: 'المجموعة ج' }
 const GROUP_LABELS_EN = { A: 'Group A', B: 'Group B', C: 'Group C' }
 
@@ -43,7 +35,6 @@ export default function ScheduleEagleEyeView({
   const storeMatches = useMatchesStore((s) => s.matches)
   const containerRef = useRef(null)
   const [capturing, setCapturing] = useState(false)
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false)
   const [shareModal, setShareModal] = useState(false)
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [filterGroup, setFilterGroup] = useState('all')

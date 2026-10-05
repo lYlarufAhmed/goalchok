@@ -6,8 +6,6 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
-  query,
-  where,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import { generateUUID } from '../utils/uuid'

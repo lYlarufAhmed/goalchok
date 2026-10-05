@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Trophy, CheckCircle, Lock, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react'
 
 import { useKnockoutStore } from '../../stores/useKnockoutStore'
@@ -37,6 +37,8 @@ export default function KnockoutAdminPage() {
     // so we do NOT call cleanup() on unmount here — doing so would kill the
     // shared subscription and break the public-facing pages.
     koStore.listenToFirestore()
+    // Deliberately run once on mount; App.jsx owns the listener lifecycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const qualifiedTeams = koStore.qualifiedTeams || []

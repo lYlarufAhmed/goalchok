@@ -14,9 +14,6 @@ export function useRealtimeTeamsQuery() {
   const [isError, setIsError] = useState(false)
 
   useEffect(() => {
-    setIsLoading(true)
-    setIsError(false)
-
     const unsub = onSnapshot(
       collection(db, 'teams'),
       (snapshot) => {
@@ -49,9 +46,6 @@ export function useRealtimeMatchesQuery() {
   const koMatches = useKnockoutStore((s) => s.knockoutMatches)
 
   useEffect(() => {
-    setIsLoading(true)
-    setIsError(false)
-
     const unsub = onSnapshot(
       collection(db, 'matches'),
       (snapshot) => {

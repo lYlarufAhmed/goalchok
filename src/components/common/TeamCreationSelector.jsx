@@ -2,7 +2,7 @@ import { useState } from 'react'
 import BottomSheet from './BottomSheet'
 import TactileButton from './TactileButton'
 
-export default function TeamCreationSelector({ onSelectTeam, existingTeams = [], isAr = false }) {
+export default function TeamCreationSelector({ onSelectTeam, isAr = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [teamName, setTeamName] = useState('')
   const [managerName, setManagerName] = useState('')

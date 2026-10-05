@@ -1,10 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager, 
-  connectFirestoreEmulator 
-} from 'firebase/firestore'
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { getDatabase, connectDatabaseEmulator } from 'firebase/database'
 
 const firebaseConfig = {
@@ -19,7 +14,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 
-import { getFirestore } from 'firebase/firestore'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 
 // Disable offline persistence for now so you don't see cached emulator data

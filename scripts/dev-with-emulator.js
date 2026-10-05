@@ -3,7 +3,7 @@ import http from 'http'
 
 async function isEmulatorRunning() {
   return new Promise((resolve) => {
-    const req = http.get('http://127.0.0.1:8085', (res) => {
+    const req = http.get('http://127.0.0.1:8085', () => {
       resolve(true)
     })
     req.on('error', () => {
@@ -30,7 +30,7 @@ async function main() {
 
   if (!running) {
     console.log('🚀 Firestore emulator is not running. Starting emulator...')
-    const emulatorProcess = spawn('npx', ['firebase', 'emulators:start', '--only', 'firestore,database'], {
+    spawn('npx', ['firebase', 'emulators:start', '--only', 'firestore,database'], {
       stdio: 'inherit',
       shell: true
     })
