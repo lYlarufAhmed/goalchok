@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ZoomIn, ZoomOut, Move } from 'lucide-react'
 import { haptic } from '../../hooks/useHaptics'
@@ -17,14 +17,18 @@ export default function ImageCropperModal({
   const dragStart = useRef({ x: 0, y: 0 })
   const lastPan = useRef({ x: 0, y: 0 })
   const imgRef = useRef(null)
+  // Natural image size, captured on load so layout is computed from state
+  const [natural, setNatural] = useState(null)
 
   // Viewport dimensions
   const VIEWPORT_SIZE = 240
 
-  // Calculate layout bounds
-  const getLayout = () => {
-    if (!imgRef.current) return { fitW: VIEWPORT_SIZE, fitH: VIEWPORT_SIZE, centerX: 0, centerY: 0 }
-    const { naturalWidth: w, naturalHeight: h } = imgRef.current
+  // Calculate layout bounds for a given zoom level
+  const getLayout = (z = zoom) => {
+    if (!natural) {
+      return { fitW: VIEWPORT_SIZE, fitH: VIEWPORT_SIZE, activeW: VIEWPORT_SIZE, activeH: VIEWPORT_SIZE, centerX: 0, centerY: 0 }
+    }
+    const { w, h } = natural
     let fitW = VIEWPORT_SIZE
     let fitH = VIEWPORT_SIZE
 
@@ -34,8 +38,8 @@ export default function ImageCropperModal({
       fitH = (h / w) * VIEWPORT_SIZE
     }
 
-    const activeW = fitW * zoom
-    const activeH = fitH * zoom
+    const activeW = fitW * z
+    const activeH = fitH * z
 
     const centerX = (VIEWPORT_SIZE - activeW) / 2
     const centerY = (VIEWPORT_SIZE - activeH) / 2
@@ -43,10 +47,11 @@ export default function ImageCropperModal({
     return { fitW, fitH, activeW, activeH, centerX, centerY }
   };
 
-  const { activeW = VIEWPORT_SIZE, activeH = VIEWPORT_SIZE, centerX = 0, centerY = 0 } = getLayout()
+  const { fitW, fitH, activeW, activeH, centerX, centerY } = getLayout()
 
   // Clamp function to keep image covering the viewport
-  const clampPan = (x, y) => {
+  const clampPan = (x, y, layout = { activeW, activeH }) => {
+    const { activeW, activeH } = layout
     const maxX = (activeW - VIEWPORT_SIZE) / 2
     const maxY = (activeH - VIEWPORT_SIZE) / 2
     return {
@@ -55,14 +60,18 @@ export default function ImageCropperModal({
     }
   }
 
-  // Reset zoom & pan when modal opens with a new image
-  useEffect(() => {
-    if (isOpen) {
+  // Reset zoom & pan when the modal opens with a new image
+  // (render-phase adjustment instead of a state-resetting effect)
+  const resetKey = isOpen ? imageSrc : null
+  const [prevResetKey, setPrevResetKey] = useState(null)
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey)
+    if (resetKey !== null) {
       setZoom(1)
       setPan({ x: 0, y: 0 })
-      lastPan.current = { x: 0, y: 0 }
+      setNatural(null)
     }
-  }, [isOpen, imageSrc])
+  }
 
   const handleStart = (clientX, clientY) => {
     haptic.light()
@@ -86,9 +95,8 @@ export default function ImageCropperModal({
   // Adjust zoom and keep pan clamped
   const handleZoomChange = (val) => {
     setZoom(val)
-    // Recalculate layout with new zoom to clamp pan
-    const nextPan = clampPan(pan.x, pan.y)
-    setPan(nextPan)
+    // Clamp pan against the layout at the new zoom
+    setPan(clampPan(pan.x, pan.y, getLayout(val)))
   }
 
   // Crop drawing onto canvas and export base64
@@ -181,14 +189,14 @@ export default function ImageCropperModal({
                   src={imageSrc}
                   alt="Crop Preview"
                   draggable={false}
-                  onLoad={() => {
-                    // Force state recalculation after image loads
-                    setZoom(1.0001)
+                  onLoad={(e) => {
+                    const { naturalWidth: w, naturalHeight: h } = e.currentTarget
+                    setNatural({ w, h })
                   }}
                   className="absolute pointer-events-none max-w-none origin-center"
                   style={{
-                    width: getLayout().fitW,
-                    height: getLayout().fitH,
+                    width: fitW,
+                    height: fitH,
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   }}
                 />

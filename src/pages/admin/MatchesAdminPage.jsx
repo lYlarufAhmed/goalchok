@@ -284,11 +284,14 @@ export default function MatchesAdminPage() {
   
   const { t, isAr } = useI18n()
   const koStore = useKnockoutStore()
+  // Zustand actions are stable references, so this subscribes once
+  const listenToKnockout = useKnockoutStore((s) => s.listenToFirestore)
+  const cleanupKnockout = useKnockoutStore((s) => s.cleanup)
 
   useEffect(() => {
-    koStore.listenToFirestore()
-    return () => koStore.cleanup()
-  }, [])
+    listenToKnockout()
+    return () => cleanupKnockout()
+  }, [listenToKnockout, cleanupKnockout])
 
   const [formOpen, setFormOpen] = useState(false)
   const [resultMatch, setResultMatch] = useState(null)

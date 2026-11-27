@@ -23,11 +23,17 @@ export function useLiveMatch(matchId) {
         unsubscribe()
       }
     } catch (err) {
-      if (active) {
-        setError(err.message || 'فشل الاتصال بالبث المباشر')
-        setLoading(false)
+      // Report asynchronously: setting state synchronously in an effect
+      // body cascades renders.
+      queueMicrotask(() => {
+        if (active) {
+          setError(err.message || 'فشل الاتصال بالبث المباشر')
+          setLoading(false)
+        }
+      })
+      return () => {
+        active = false
       }
-      return undefined
     }
   }, [matchId])
 

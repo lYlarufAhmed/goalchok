@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Radio } from 'lucide-react'
 import { haptic } from '../../../hooks/useHaptics'
@@ -10,15 +10,20 @@ export default function LiveScoreModal({ isOpen, onClose, onSubmit, match, teamA
   const [errors, setErrors] = useState({})
   const { t } = useI18n()
 
-  useEffect(() => {
-    if (isOpen && match) {
-      const currentA = liveData?.scoreA ?? match.result?.scoreA ?? 0
-      const currentB = liveData?.scoreB ?? match.result?.scoreB ?? 0
+  // Prefill on open, and re-sync whenever the stored/live score changes
+  // while open (render-phase adjustment instead of an effect)
+  const currentA = liveData?.scoreA ?? match?.result?.scoreA ?? 0
+  const currentB = liveData?.scoreB ?? match?.result?.scoreB ?? 0
+  const resetKey = isOpen && match ? `${match.id}:${currentA}:${currentB}` : null
+  const [prevResetKey, setPrevResetKey] = useState(null)
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey)
+    if (resetKey !== null) {
       setScoreA(currentA)
       setScoreB(currentB)
       setErrors({})
     }
-  }, [isOpen, match, liveData])
+  }
 
   const validate = () => {
     const nextErrors = {}
