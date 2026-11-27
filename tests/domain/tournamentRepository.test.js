@@ -69,12 +69,22 @@ describe('InMemoryTournamentRepository — the persistence seam', () => {
       expect(matches[0].result.scoreA).toBe(2)
     })
 
+    it('corrects the result of a completed match', async () => {
+      await repo.saveMatch({ group: 'A', teamA: 't1', teamB: 't2', venue: 'V' })
+      const [match] = await repo.fetchMatches()
+      await repo.saveMatchResult(match.id, { scoreA: 1, scoreB: 0 })
+      await repo.saveMatchResult(match.id, { scoreA: 2, scoreB: 0 })
+      const [updated] = await repo.fetchMatches()
+      expect(updated.status).toBe('completed')
+      expect(updated.result.scoreA).toBe(2)
+    })
+
     it('rejects an invalid lifecycle transition', async () => {
       await repo.saveMatch({ group: 'A', teamA: 't1', teamB: 't2', venue: 'V' })
       const [match] = await repo.fetchMatches()
-      // scheduled -> completed is legal, but completing twice is not
       await repo.saveMatchResult(match.id, { scoreA: 1, scoreB: 0 })
-      await expect(repo.saveMatchResult(match.id, { scoreA: 2, scoreB: 0 })).rejects.toThrow(
+      // completed -> live is not a legal transition
+      await expect(repo.setMatchStatus(match.id, 'live')).rejects.toThrow(
         /Invalid state transition/
       )
     })

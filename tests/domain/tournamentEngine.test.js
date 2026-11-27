@@ -198,4 +198,19 @@ describe('TournamentEngine — Deep Domain Module', () => {
     expect(bracket.SF.map((m) => m && m.id)).toEqual([null, 'sf2'])
     expect(bracket.F.map((m) => m && m.id)).toEqual(['f1'])
   })
+
+  it('places matches stored with legacy Arabic/numeric round names', () => {
+    const engine = new TournamentEngine([], [], [
+      { id: 'qf', round: 'ربع النهائي', matchNumber: 1, status: 'scheduled', result: null },
+      { id: 'qf8', round: 'Round 8', matchNumber: 2, status: 'scheduled', result: null },
+      { id: 'sf', round: 'نصف النهائي', matchNumber: 1, status: 'scheduled', result: null },
+      { id: 'f', round: 'Final', status: 'scheduled', result: null },
+      { id: 'other', round: 'Third Place', status: 'scheduled', result: null },
+    ])
+
+    const bracket = engine.getBracket()
+    expect(bracket.QF.map((m) => m && m.id)).toEqual(['qf', 'qf8', null, null])
+    expect(bracket.SF.map((m) => m && m.id)).toEqual(['sf', null])
+    expect(bracket.F.map((m) => m && m.id)).toEqual(['f'])
+  })
 })

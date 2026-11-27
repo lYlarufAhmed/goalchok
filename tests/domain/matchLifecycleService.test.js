@@ -13,6 +13,7 @@ describe('MatchLifecycleService', () => {
       expect(service.validateStateTransition('live', 'postponed')).toBe(true)
       expect(service.validateStateTransition('live', 'scheduled')).toBe(true)
       expect(service.validateStateTransition('completed', 'scheduled')).toBe(true)
+      expect(service.validateStateTransition('completed', 'completed')).toBe(true)
       expect(service.validateStateTransition('postponed', 'scheduled')).toBe(true)
       expect(service.validateStateTransition('postponed', 'live')).toBe(true)
     })
@@ -106,6 +107,14 @@ describe('MatchLifecycleService', () => {
       expect(updated.status).toBe('completed')
       expect(updated.result.scoreA).toBe(3)
       expect(updated.result.scoreB).toBe(1)
+    })
+
+    it('corrects the result of an already completed match', () => {
+      const match = { id: 'm1', status: 'completed', teamA: 't1', teamB: 't2', result: { scoreA: 1, scoreB: 0 } }
+      const updated = service.completeMatch(match, { scoreA: 2, scoreB: 2 })
+      expect(updated.status).toBe('completed')
+      expect(updated.result.scoreA).toBe(2)
+      expect(updated.result.scoreB).toBe(2)
     })
   })
 

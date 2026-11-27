@@ -320,7 +320,8 @@ export class TournamentEngine {
    * Resolve the Knockout Progression bracket into canonical slots.
    * Slot identity comes from matchNumber, falling back to a trailing digit
    * in matchLabel, then to arrival order — never from substring-sniffing
-   * round or label text.
+   * label text. The round itself is canonicalised by canonicalRound(), which
+   * still accepts the legacy Arabic/numeric round names stored data may carry.
    * @returns {{QF: (Object|null)[4], SF: (Object|null)[2], F: (Object|null)[1]}}
    */
   getBracket() {
@@ -342,8 +343,8 @@ export class TournamentEngine {
     }
 
     this.knockoutMatches.forEach((m) => {
-      const round = String(m.round || '').toUpperCase()
-      if (!(round in rounds)) return
+      const round = TournamentEngine.canonicalRound(m.round)
+      if (!round) return
       const slots = rounds[round]
       let idx = slotOf(m, slots.length)
       if (idx === null || slots[idx]) idx = slots.findIndex((s) => !s)
@@ -351,6 +352,20 @@ export class TournamentEngine {
     })
 
     return rounds
+  }
+
+  /**
+   * Map a stored round value to its canonical code ('QF' | 'SF' | 'F').
+   * Order matters: 'ربع النهائي' and 'نصف النهائي' both contain 'نهائي'.
+   * @param {string} round
+   * @returns {('QF'|'SF'|'F'|null)}
+   */
+  static canonicalRound(round) {
+    const r = String(round || '').trim().toUpperCase()
+    if (r === 'QF' || r.includes('8') || r.includes('ربع')) return 'QF'
+    if (r === 'SF' || r.includes('4') || r.includes('نصف')) return 'SF'
+    if (r === 'F' || r.includes('FINAL') || r.includes('نهائي')) return 'F'
+    return null
   }
 
   // The bracket shape: how many matches feed each round, the labels and
