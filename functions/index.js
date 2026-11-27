@@ -2,7 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
 import admin from 'firebase-admin';
 import { beforeUserCreated } from 'firebase-functions/v2/identity';
-import { canManageClaims, defaultClaims, PRIVILEGED_ROLE } from './claims.js';
+import { applyClaimChanges, canManageClaims, defaultClaims } from './claims.js';
 
 admin.initializeApp();
 
@@ -17,36 +17,39 @@ export const assignOrgId = onCall(async (request) => {
     throw new HttpsError('permission-denied', 'Only admins can manage org claims.');
   }
 
-  const { targetUid, orgId, role } = request.data;
+  // For orgId and role: omit to keep, pass a value to set, pass null to revoke.
+  const { targetUid, orgId, role } = request.data || {};
   const callerUid = request.auth.uid;
-
   const uidToUpdate = targetUid || callerUid;
-  const claimsToSet = {};
-  if (orgId) {
-    if (typeof orgId !== 'string' || !orgId.trim()) {
-      throw new HttpsError('invalid-argument', 'orgId must be a non-empty string.');
-    }
-    claimsToSet.orgId = orgId;
+
+  // An admin can't demote themselves — prevents locking every admin out.
+  if (uidToUpdate === callerUid && role === null) {
+    throw new HttpsError('failed-precondition', 'Admins cannot revoke their own admin role.');
   }
-  if (role) {
-    if (role !== PRIVILEGED_ROLE) {
-      throw new HttpsError('invalid-argument', `role must be "${PRIVILEGED_ROLE}" or omitted.`);
-    }
-    claimsToSet.role = role;
+
+  let userRecord;
+  try {
+    userRecord = await getAuth().getUser(uidToUpdate);
+  } catch (error) {
+    console.error('Error loading user for claims update:', error);
+    throw new HttpsError('not-found', 'User not found.');
+  }
+
+  let result;
+  try {
+    result = applyClaimChanges(userRecord.customClaims, { orgId, role });
+  } catch (error) {
+    throw new HttpsError('invalid-argument', error.message);
   }
 
   try {
-    const userRecord = await getAuth().getUser(uidToUpdate);
-    const currentClaims = userRecord.customClaims || {};
-
-    // Merge new claims with existing ones
-    const newClaims = {
-      ...currentClaims,
-      ...claimsToSet
-    };
-
-    await getAuth().setCustomUserClaims(uidToUpdate, newClaims);
-    return { success: true, claims: newClaims };
+    await getAuth().setCustomUserClaims(uidToUpdate, result.claims);
+    // A revoked claim stays in the user's current ID token until it expires;
+    // revoking refresh tokens signs them out instead of waiting up to an hour.
+    if (result.removed.length) {
+      await getAuth().revokeRefreshTokens(uidToUpdate);
+    }
+    return { success: true, claims: result.claims, removed: result.removed };
   } catch (error) {
     console.error('Error setting custom claims:', error);
     throw new HttpsError('internal', 'Error setting custom claims.');

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { Lock, ShieldAlert, ArrowRight, Loader2 } from 'lucide-react'
 import { haptic } from '../../hooks/useHaptics'
@@ -10,11 +10,15 @@ import { useI18n } from '../../i18n/useI18n'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const login = useAuthStore((state) => state.login)
   const navigate = useNavigate()
+  const location = useLocation()
   const { isAr } = useI18n()
+  const notAdminMsg = isAr
+    ? 'هذا الحساب لا يملك صلاحيات المشرف'
+    : 'This account does not have admin access'
+  const [errorMsg, setErrorMsg] = useState(location.state?.reason === 'not-admin' ? notAdminMsg : '')
+  const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -30,7 +34,11 @@ export default function LoginPage() {
       navigate('/admin/dashboard')
     } else {
       haptic.heavy()
-      setErrorMsg(result.error || (isAr ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials'))
+      setErrorMsg(
+        result.code === 'not-admin'
+          ? notAdminMsg
+          : result.error || (isAr ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials')
+      )
       setSubmitting(false)
     }
   }
