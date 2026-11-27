@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2, ImagePlus, Camera } from 'lucide-react'
 import { MAX_PLAYERS } from '../../../utils/tournamentLimits'
@@ -34,8 +34,13 @@ export default function TeamFormModal({ isOpen, onClose, onSubmit, team, maxTeam
     playerIndex: null,
   })
 
-  useEffect(() => {
-    if (isOpen) {
+  // Prefill when the modal opens for a team (or for a new one).
+  // Render-phase adjustment instead of a state-resetting effect.
+  const resetKey = isOpen ? (team?.id ?? 'new') : null
+  const [prevResetKey, setPrevResetKey] = useState(null)
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey)
+    if (resetKey !== null) {
       if (team) {
         setForm({
           name: team.name || '',
@@ -49,9 +54,9 @@ export default function TeamFormModal({ isOpen, onClose, onSubmit, team, maxTeam
         })
         // Load existing player photos
         const photos = {}
-        team.players.forEach((p, i) => {
-          if (p.photo) photos[i] = p.photo
-        })
+        for (const [i, p] of (team.players || []).entries()) {
+          if (p?.photo) photos[i] = p.photo
+        }
         setPlayerPhotos(photos)
       } else {
         const randomColor = getRandomTeamColor(existingColors)
@@ -61,7 +66,7 @@ export default function TeamFormModal({ isOpen, onClose, onSubmit, team, maxTeam
       setErrors({})
       setSubmitting(false)
     }
-  }, [isOpen, team, existingColors])
+  }
 
   const MAX_FILE_SIZE = 12 * 1024 * 1024 // 12MB
 

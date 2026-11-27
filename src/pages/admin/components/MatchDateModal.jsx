@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Calendar } from 'lucide-react'
 import { haptic } from '../../../hooks/useHaptics'
@@ -9,8 +9,12 @@ export default function MatchDateModal({ isOpen, onClose, onSubmit, match, teamA
   const [errors, setErrors] = useState({})
   const { t, isAr } = useI18n()
 
-  useEffect(() => {
-    if (isOpen && match) {
+  // Prefill when the modal opens for a match (render-phase adjustment)
+  const resetKey = isOpen && match ? match.id : null
+  const [prevResetKey, setPrevResetKey] = useState(null)
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey)
+    if (resetKey !== null) {
       setForm({
         date: match.date || '',
         time: match.time || '',
@@ -18,7 +22,7 @@ export default function MatchDateModal({ isOpen, onClose, onSubmit, match, teamA
       })
       setErrors({})
     }
-  }, [isOpen, match])
+  }
 
   const validate = () => {
     const nextErrors = {}
