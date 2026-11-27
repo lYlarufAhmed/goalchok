@@ -1,6 +1,5 @@
 import {
   doc,
-  getDoc,
   getDocs,
   setDoc,
   updateDoc,
@@ -134,9 +133,4 @@ export function subscribeKnockoutState(orgId, tournamentId, onData, onError) {
     (snapshot) => onData(snapshot),
     (err) => onError && onError(err)
   )
-}
-
-export async function fetchKnockoutState(orgId, tournamentId) {
-  const snap = await getDoc(getTenantDoc(orgId, tournamentId, 'settings', STATE_DOC))
-  return snap.exists() ? snap.data() : null
 }

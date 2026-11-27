@@ -29,3 +29,6 @@ playwright-report/
 .pnpm-store
 node_modules
 .env
+
+# Firebase CLI hosting cache
+.firebase/
