@@ -37,5 +37,5 @@ The isolation boundary that owns all tournament data. Documents live under `orga
 _Avoid_: Workspace, Account, Team (already means a competing football team)
 
 **Admin Claim**:
-The `role: 'admin'` custom claim on a Firebase Auth user — the only claim that authorizes writes to Firestore and RTDB. It is set only by an existing admin (via the `assignOrgId` callable) or out-of-band for the first admin; sign-up grants org membership only.
+The `role: 'admin'` custom claim on a Firebase Auth user — the only claim that authorizes writes to Firestore and RTDB. It is set only by an existing admin (via the `assignOrgId` callable) or out-of-band for the first admin; sign-up grants org membership only. An admin revokes it the same way (`role: null`), which also signs the user out; admins cannot revoke their own. Signed-in users without it are kept out of the admin area.
 _Avoid_: isAdmin flag, superuser, root

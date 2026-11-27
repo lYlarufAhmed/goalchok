@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../../stores/useAuthStore'
+import { useAuthStore, isAdminClaims } from '../../stores/useAuthStore'
 import { useAppStore } from '../../stores/useAppStore'
 import { Trophy, LogOut, LayoutDashboard, Users, Calendar, Shuffle, RotateCcw, Swords } from 'lucide-react'
 import LoadingState from '../../components/common/LoadingState'
@@ -31,6 +31,7 @@ const navItemsAr = [
 
 export default function AdminLayout() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isAdmin = useAuthStore((state) => isAdminClaims(state.claims))
   const loadingAuth = useAuthStore((state) => state.loading)
   const logout = useAuthStore((state) => state.logout)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -49,6 +50,11 @@ export default function AdminLayout() {
 
   if (!isAuthenticated && !isLoggingOut) {
     return <Navigate to="/admin/login" replace />
+  }
+
+  // Signed in, but without the Admin Claim (e.g. revoked after sign-in)
+  if (isAuthenticated && !isAdmin && !isLoggingOut) {
+    return <Navigate to="/admin/login" replace state={{ reason: 'not-admin' }} />
   }
 
   const handleLogout = () => {
