@@ -5,7 +5,7 @@ const mockSetDoc = vi.fn()
 const mockOnSnapshot = vi.fn()
 
 vi.mock('firebase/firestore', () => ({
-  doc: vi.fn((_db, path, id) => ({ path: `${path}/${id}` })),
+  doc: vi.fn((_db, ...segments) => ({ path: segments.slice(0, -1).join('/') + '/' + segments[segments.length - 1] })),
   setDoc: (...args) => mockSetDoc(...args),
   onSnapshot: (docRef, callback) => {
     mockOnSnapshotCallback = callback
@@ -75,10 +75,14 @@ describe('Knockout Store — Admin & Public Sync Simulation', () => {
     expect(mockSetDoc).toHaveBeenCalledTimes(2)
     
     const [matchDocRef, matchPayload] = mockSetDoc.mock.calls[0]
-    expect(matchDocRef.path).toBe('knockout_matches/' + matchPayload.id)
+    expect(matchDocRef.path).toBe(
+      'organizations/default-org/tournaments/default-tournament/knockout/' + matchPayload.id
+    )
 
     const [docRef, payload] = mockSetDoc.mock.calls[1]
-    expect(docRef.path).toBe('settings/knockout')
+    expect(docRef.path).toBe(
+      'organizations/default-org/tournaments/default-tournament/settings/state'
+    )
     expect(payload.step).toBe(3)
 
     // ────────────────────────────────────────────────────────────────────────
@@ -99,7 +103,7 @@ describe('Knockout Store — Admin & Public Sync Simulation', () => {
 
     await publicStore.listenToFirestore()
 
-    // Verify onSnapshot was called to listen to settings/knockout in Firestore
+    // Verify the store subscribed to the tenant knockout-state document
     expect(mockOnSnapshot).toHaveBeenCalledTimes(0) // We mocked onSnapshot in the vi.mock block
 
     // Simulate an update pushed from Firestore (e.g., admin added/updated a match)

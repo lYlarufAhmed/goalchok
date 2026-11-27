@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { canManageClaims, defaultClaims, PRIVILEGED_ROLE } from '../../functions/claims.js'
 
+const sharedTenant = JSON.parse(readFileSync(new URL('../../shared/tenant.json', import.meta.url)))
+
 describe('claims trust boundary', () => {
+  it('keeps the default org claim in sync with shared/tenant.json', () => {
+    expect(defaultClaims().orgId).toBe(sharedTenant.defaultOrg)
+  })
+
   it('exports the privileged role constant', () => {
     expect(PRIVILEGED_ROLE).toBe('admin')
   })

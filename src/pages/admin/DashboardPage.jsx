@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import DarkCard from '../../components/common/DarkCard'
 import { useTeamsQuery, useMatchesQuery } from '../../hooks/useQueries'
-import { MAX_TEAMS } from '../../stores/useTeamsStore' // Keep helpers if needed for now
+import { MAX_TEAMS } from '../../utils/tournamentLimits'
 import { useI18n } from '../../i18n/useI18n'
 import { haptic } from '../../hooks/useHaptics'
 

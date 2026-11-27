@@ -1,5 +1,5 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { db } from '../config/firebase'
+import { getDoc, setDoc } from 'firebase/firestore'
+import { getTenantDoc } from './tenantContext'
 
 const DOC_ID = 'tournament'
 
@@ -10,14 +10,14 @@ const defaultGroups = {
   locked: false,
 }
 
-export async function fetchGroups() {
-  const snap = await getDoc(doc(db, 'groups', DOC_ID))
+export async function fetchGroups(orgId, tournamentId) {
+  const snap = await getDoc(getTenantDoc(orgId, tournamentId, 'groups', DOC_ID))
   if (!snap.exists()) return defaultGroups
   return { ...defaultGroups, ...snap.data() }
 }
 
-export async function saveGroups(groups) {
-  await setDoc(doc(db, 'groups', DOC_ID), {
+export async function saveGroups(orgId, tournamentId, groups) {
+  await setDoc(getTenantDoc(orgId, tournamentId, 'groups', DOC_ID), {
     A: groups.A || [],
     B: groups.B || [],
     C: groups.C || [],
@@ -25,6 +25,6 @@ export async function saveGroups(groups) {
   })
 }
 
-export async function clearGroupsDoc() {
-  await setDoc(doc(db, 'groups', DOC_ID), defaultGroups)
+export async function clearGroupsDoc(orgId, tournamentId) {
+  await setDoc(getTenantDoc(orgId, tournamentId, 'groups', DOC_ID), defaultGroups)
 }

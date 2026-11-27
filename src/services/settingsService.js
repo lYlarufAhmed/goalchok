@@ -1,5 +1,5 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { db } from '../config/firebase'
+import { getDoc, setDoc } from 'firebase/firestore'
+import { getTenantDoc } from './tenantContext'
 
 const DOC_ID = 'config'
 
@@ -10,12 +10,12 @@ const defaultSettings = {
   language: 'ar',
 }
 
-export async function fetchSettings() {
-  const snap = await getDoc(doc(db, 'settings', DOC_ID))
+export async function fetchSettings(orgId, tournamentId) {
+  const snap = await getDoc(getTenantDoc(orgId, tournamentId, 'settings', DOC_ID))
   if (!snap.exists()) return defaultSettings
   return { ...defaultSettings, ...snap.data() }
 }
 
-export async function updateSettings(updates) {
-  await setDoc(doc(db, 'settings', DOC_ID), updates, { merge: true })
+export async function updateSettings(orgId, tournamentId, updates) {
+  await setDoc(getTenantDoc(orgId, tournamentId, 'settings', DOC_ID), updates, { merge: true })
 }

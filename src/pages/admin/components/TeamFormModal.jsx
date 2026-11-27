@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2, ImagePlus, Camera } from 'lucide-react'
-import { MAX_PLAYERS } from '../../../stores/useTeamsStore'
+import { MAX_PLAYERS } from '../../../utils/tournamentLimits'
 import { useI18n } from '../../../i18n/useI18n'
 import { haptic } from '../../../hooks/useHaptics'
 import { TEAM_COLORS, getRandomTeamColor } from '../../../utils/teamColors'

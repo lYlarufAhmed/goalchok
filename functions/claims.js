@@ -22,6 +22,10 @@ export function canManageClaims(claims) {
 /**
  * Claims assigned to every newly created user: org membership only,
  * never a privileged role.
+ *
+ * The literal mirrors shared/tenant.json (defaultOrg) — the functions
+ * package cannot import files outside functions/ at deploy time, so the
+ * equality is pinned by tests/utils/claims.test.js instead.
  */
 export function defaultClaims() {
   return { orgId: 'default-org' }

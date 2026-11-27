@@ -99,7 +99,7 @@ export default function ScheduleEagleEyePage() {
           transition={{ duration: 0.25 }}
         >
           {view === 'table' ? (
-            <ScheduleEagleEyeView teamsOverride={teams} matchesOverride={matches} />
+            <ScheduleEagleEyeView teams={teams} matches={matches} />
           ) : (
             <TournamentBracketView teams={teams} />
           )}

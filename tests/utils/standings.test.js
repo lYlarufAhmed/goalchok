@@ -25,6 +25,8 @@ describe('Group Standings Engine (calculateStandings)', () => {
       gf: 0,
       ga: 0,
       pts: 0,
+      yellow: 0,
+      red: 0,
     })
   })
 

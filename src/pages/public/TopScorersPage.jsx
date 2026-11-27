@@ -5,7 +5,7 @@ import PlayerAvatar from '../../components/common/PlayerAvatar'
 import LoadingState from '../../components/common/LoadingState'
 import ErrorState from '../../components/common/ErrorState'
 import EmptyState from '../../components/common/EmptyState'
-import { useRealtimeTeamsQuery, useRealtimeMatchesQuery } from '../../hooks/useRealtimeQueries'
+import { useTeamsSubscription, useMatchesSubscription } from '../../hooks/useTournamentRepository'
 import { calculateTopScorers } from '../../utils/scorers'
 import { useAppStore } from '../../stores/useAppStore'
 
@@ -33,8 +33,8 @@ const PODIUM_HEIGHTS = { 1: 'h-36', 2: 'h-28', 3: 'h-24' }
 
 export default function TopScorersPage() {
   const lang = useAppStore((s) => s.language)
-  const { data: teams = [], isLoading: teamsLoading, isError: teamsError, refetch: refetchTeams } = useRealtimeTeamsQuery()
-  const { data: matches = [], isLoading: matchesLoading, isError: matchesError, refetch: refetchMatches } = useRealtimeMatchesQuery()
+  const { data: teams = [], isLoading: teamsLoading, isError: teamsError, refetch: refetchTeams } = useTeamsSubscription()
+  const { data: matches = [], isLoading: matchesLoading, isError: matchesError, refetch: refetchMatches } = useMatchesSubscription()
 
   const scorers = useMemo(() => calculateTopScorers(teams, matches), [teams, matches])
   const top3 = scorers.slice(0, 3)

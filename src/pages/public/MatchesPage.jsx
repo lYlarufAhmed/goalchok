@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import MatchRow from '../../components/common/MatchRow'
 import EmptyState from '../../components/common/EmptyState'
 import ErrorState from '../../components/common/ErrorState'
-import { useRealtimeMatchesQuery, useRealtimeTeamsQuery } from '../../hooks/useRealtimeQueries'
+import { useMatchesSubscription, useTeamsSubscription } from '../../hooks/useTournamentRepository'
 import { useAppStore } from '../../stores/useAppStore'
 import { useNavigate } from 'react-router-dom'
 import { haptic } from '../../hooks/useHaptics'
@@ -67,8 +67,8 @@ const rowVariants = {
 export default function MatchesPage() {
   const lang = useAppStore((s) => s.language)
   const navigate = useNavigate()
-  const { data: matches = [], isLoading, isError, refetch } = useRealtimeMatchesQuery()
-  const { data: teams = [] } = useRealtimeTeamsQuery()
+  const { data: matches = [], isLoading, isError, refetch } = useMatchesSubscription()
+  const { data: teams = [] } = useTeamsSubscription()
   const [filter, setFilter] = useState('all')
 
   const isAr = lang === 'ar'

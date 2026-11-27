@@ -1,7 +1,8 @@
 const ALLOWED_TRANSITIONS = {
   scheduled: ['live', 'completed', 'postponed'],
   live: ['completed', 'postponed', 'scheduled'],
-  completed: ['scheduled'],
+  // completed -> completed is a result correction (admin edits a final score)
+  completed: ['scheduled', 'completed'],
   postponed: ['scheduled', 'live'],
 }
 

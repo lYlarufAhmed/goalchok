@@ -1,6 +1,10 @@
+import { createRequire } from 'node:module'
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
+
+const require = createRequire(import.meta.url)
+const tenant = require('../shared/tenant.json')
 
 // Seeding runs with elevated privileges (Admin SDK bypasses security rules)
 // and provisions the local admin account used for the emulator dev loop.
@@ -17,7 +21,7 @@ const app = initializeApp({ projectId: PROJECT_ID })
 
 const db = getFirestore(app)
 const auth = getAuth(app)
-const TENANT_BASE = ['organizations', 'default-org', 'tournaments', 'default-tournament']
+const TENANT_BASE = ['organizations', tenant.defaultOrg, 'tournaments', tenant.defaultTournament]
 
 const bangladeshTeams = [
   // Group A
@@ -212,12 +216,12 @@ const dummyMatches = [
 async function seedDevAdmin() {
   try {
     const user = await auth.createUser(DEV_ADMIN)
-    await auth.setCustomUserClaims(user.uid, { orgId: 'default-org', role: 'admin' })
+    await auth.setCustomUserClaims(user.uid, { orgId: tenant.defaultOrg, role: 'admin' })
     console.log(`Created dev admin ${DEV_ADMIN.email}`)
   } catch (err) {
     if (err.code === 'auth/email-already-exists') {
       const user = await auth.getUserByEmail(DEV_ADMIN.email)
-      await auth.setCustomUserClaims(user.uid, { orgId: 'default-org', role: 'admin' })
+      await auth.setCustomUserClaims(user.uid, { orgId: tenant.defaultOrg, role: 'admin' })
       console.log(`Dev admin ${DEV_ADMIN.email} already exists; claims refreshed`)
     } else {
       throw err
@@ -237,8 +241,8 @@ async function seed() {
     batch.set(db.doc([...TENANT_BASE, 'teams', team.id].join('/')), team)
   }
 
-  // 2. Seed Groups (legacy top-level path — read by the groups service)
-  batch.set(db.doc('groups/groups_doc'), {
+  // 2. Seed Groups (tenant path — read by the groups service)
+  batch.set(db.doc([...TENANT_BASE, 'groups', 'tournament'].join('/')), {
     A: ['team-bashundhara', 'team-abahani', 'team-mohammedan', 'team-ctg-abahani'],
     B: ['team-russel', 'team-jamal', 'team-police', 'team-rahmatganj'],
     C: [],
@@ -250,8 +254,8 @@ async function seed() {
     batch.set(db.doc([...TENANT_BASE, 'matches', m.id].join('/')), m)
   }
 
-  // 4. Seed Settings (legacy top-level path — read by the settings service)
-  batch.set(db.doc('settings/tournament'), {
+  // 4. Seed Settings (tenant path — read by the settings service)
+  batch.set(db.doc([...TENANT_BASE, 'settings', 'config'].join('/')), {
     drawLocked: true,
     tournamentPhase: 'مرحلة المجموعات'
   })

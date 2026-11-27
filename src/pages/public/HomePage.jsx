@@ -15,7 +15,7 @@ import PlayerAvatar from '../../components/common/PlayerAvatar'
 import ContactFooter from '../../components/common/ContactFooter'
 import Meteors from '../../components/effects/Meteors'
 import TournamentBracketView from '../../components/common/TournamentBracketView'
-import { useRealtimeTeamsQuery, useRealtimeMatchesQuery } from '../../hooks/useRealtimeQueries'
+import { useTeamsSubscription, useMatchesSubscription } from '../../hooks/useTournamentRepository'
 import { enrichMatch, compareMatchesByDateTime } from '../../utils/matchHelpers'
 import { calculateTopScorers, getTotalGoals } from '../../utils/scorers'
 import { useAppStore } from '../../stores/useAppStore'
@@ -36,8 +36,8 @@ export default function HomePage() {
   const isRtl = lang === 'ar'
   const containerRef = useRef(null)
 
-  const { data: teams = [], isLoading: teamsLoading, isError: teamsError, refetch: refetchTeams } = useRealtimeTeamsQuery()
-  const { data: matches = [], isLoading: matchesLoading, isError: matchesError, refetch: refetchMatches } = useRealtimeMatchesQuery()
+  const { data: teams = [], isLoading: teamsLoading, isError: teamsError, refetch: refetchTeams } = useTeamsSubscription()
+  const { data: matches = [], isLoading: matchesLoading, isError: matchesError, refetch: refetchMatches } = useMatchesSubscription()
 
   const isLoading = teamsLoading || matchesLoading
   const isError = teamsError || matchesError

@@ -7,7 +7,7 @@ import TeamLogo from '../../components/common/TeamLogo'
 import LoadingState from '../../components/common/LoadingState'
 import ErrorState from '../../components/common/ErrorState'
 import EmptyState from '../../components/common/EmptyState'
-import { useRealtimeTeamsQuery } from '../../hooks/useRealtimeQueries'
+import { useTeamsSubscription } from '../../hooks/useTournamentRepository'
 import { haptic } from '../../hooks/useHaptics'
 import { useTranslation } from '../../hooks/useTranslation'
 
@@ -15,7 +15,7 @@ export default function TeamsPage() {
   const { t, lang } = useTranslation()
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const { data: teams = [], isLoading, isError, refetch } = useRealtimeTeamsQuery()
+  const { data: teams = [], isLoading, isError, refetch } = useTeamsSubscription()
 
   const filteredTeams = useMemo(() => {
     return teams.filter((team) => {
